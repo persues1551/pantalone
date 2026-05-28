@@ -383,6 +383,25 @@ pytest ~/.hermes/scripts/amadeus/tests/test_pantalone_data.py -v
 8. 无虚构数据？（所有数据可验证）
 9. **有数据质量区块？（data_quality.py --report-fragment输出已在报告开头）**
 
+## 失败模式与降级路径（集中式）
+
+> **触发条件 / 一线修复 / 仍失败兜底** — 三段式编码，禁止只写正向流程。
+
+| 触发条件 | 一线修复 | 仍失败兜底 |
+|----------|----------|-----------|
+| AKShare API超时/RemoteDisconnected | 重试3次，间隔5秒 | 降级新浪API → 标注"数据缺失" |
+| 涨跌停池返回空DataFrame | 换日期重试（T-1） | 从market_*.json的pools字段提取 |
+| 情绪温度缺2项以上数据 | 用amadeus_emotion.py自动降级 | 输出"情绪温度暂估：数据不足" |
+| 北向资金NaN/0.0 | 降级Tushare moneyflow_hsgt | 标注"北向数据缺失" |
+| 板块资金流单位存疑 | 交叉验证东方财富vs同花顺 | 标注"单位待核验" |
+| to_docx.py转换失败 | 检查python-docx是否安装 | 降级发送纯markdown |
+| humanize_auto.py篡改数据 | 校验关键数字/股票代码 | 回滚到humanize前版本 |
+| cron推送被iLink限流 | 等10分钟后重试 | 保存本地，手动补发 |
+| pool_manager remove被OCIFQ拦 | 检查是否误注入OCIFQ检查 | 直接编辑session_context.json |
+| ML预测OOM | 分批200只+gc.collect() | 降级到v4.7模型 |
+| Gateway重启打断会话 | 等重启完成后恢复 | 检查restart_gateway.sh时间门控 |
+| sudo setuid损坏 | chmod 4755 /usr/bin/sudo | 用VNC登录腾讯云控制台修复 |
+
 ## 常见坑（Top 10）
 
 1. **报告过大导致Gateway假死**：50-75KB报告分30+chunk触发iLink限流→event loop崩溃。修复：摘要+docx
