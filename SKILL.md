@@ -437,7 +437,6 @@ pytest ~/.hermes/scripts/amadeus/tests/test_pantalone_data.py -v
 25. **池子膨胀必须主动精简**：B池>15只时按主题分类保留龙头，不需要等用户指示。execute_code批量remove+直接改context做C→B升级
 26. **语言强制必须在cron prompt首尾各写一次**（2026-05-22教训）：模型生成长报告时默认用英文。修复：prompt开头加"全程必须用中文"，输出规范末尾再加一次。不能只在SKILL.md里写，cron agent不一定加载
 27. **humanizer必须在cron prompt中显式执行**（2026-05-22教训）：SKILL.md写了规则但cron agent不会主动遵循。修复：cron prompt中加显式步骤`python3 humanize_auto.py <文件> --inplace`。to_docx.py已内建humanizer（docx自动处理），但摘要文本需要单独处理
-28. **docx发送必须在cron prompt中写明第四步**（2026-05-27教训）：prompt只写"完整版走docx"不够，cron agent不知道怎么操作。必须在prompt中增加明确的**第四步**：①保存markdown ②运行`to_docx.py` ③回复中包含`MEDIA:`标签。否则cron agent只输出"已生成docx"但不实际发送
 26. **ETF池管理与个股池独立**：etf_notes和stock_notes是context中独立字段，用不同的manager脚本。ETF池有差异化止损（按ETF类型）、折溢价检查、流动性门槛（日成交额<500万警告）
 27. **amadeus_emotion.py过期检测已完善**（2026-05-21更新）：v2.0增加limit/indices缓存文件日期检查。v3.0(2026-05-21)补齐load_market_extra()的过期检测——原逻辑无日期检查且不降级到旧文件，现已与load_limit_data/load_index_data一致：今日文件→降级最新文件(标记stale)→返回None。三个数据源(涨跌停/指数/市场扩展)的过期状态均注入stale_warnings字段。报告中必须检查data_freshness字段
 28. **无交叉数据验证**：脚本层各数据源独立采集，没有自动对比"新浪vs腾讯vs东方财富"的机制。review subagent检查格式但不做数值交叉验证。
@@ -448,7 +447,6 @@ pytest ~/.hermes/scripts/amadeus/tests/test_pantalone_data.py -v
 30. **humanizer篡改事实数据（2026-05-27发现）**：`humanize_auto.py --inplace`不仅改风格，还会篡改具体数字、股票代码、数据等级。2026-05-27晚间复盘中，北向40.75亿→39.47亿，粤电力A→京能电力，数据等级C→B。修复：humanize后必须校验关键数据（指数/涨跌幅/板块流/个股代码/数据等级），发现篡改立即回滚。详见`references/humanizer-factual-errors.md`。
 31. **安全扫描阻止pipe到python3**：cron job中`cat file | python3 script.py`会被安全扫描拦截。替代方案：用`execute_code`的`subprocess.run()`传入stdin，或用`python3 -c "exec(open('file').read())"`模式。`to_docx.py`和`humanize_auto.py`的管道调用都受影响。
 32. **腾讯API返回GBK编码**：qt.gtimg.cn返回的中文是GBK编码，不能用text=True。必须用`result.stdout.decode('gbk', errors='replace')`。已在amadeus_realtime/amadeus_market_filter/amadeus_sim_integrate/amadeus_external中修复
-31. **安全扫描阻止pipe到python3**：cron job中`cat file | python3 script.py`会被安全扫描拦截。替代方案：用`execute_code`的`subprocess.run()`传入stdin，或用`python3 -c "exec(open('file').read())"`模式。`to_docx.py`和`humanize_auto.py`的管道调用都受影响。：qt.gtimg.cn返回的中文是GBK编码，不能用text=True。必须用`result.stdout.decode('gbk', errors='replace')`。已在amadeus_realtime/amadeus_market_filter/amadeus_sim_integrate/amadeus_external中修复
 32. **Gateway重启≠会话重置**（2026-05-28教训）：用户说"为什么重启"时，不要假设是"每日定时重置会话"。必须先查gateway日志确认原因。`grep "Stopping gateway" ~/.hermes/logs/gateway.log`看是否有主动重启，`journalctl`看cron触发。会话重置是Hermes内部机制（无日志），Gateway重启有明确日志记录。
 33. **Gateway重启频率诊断与修复**（2026-05-28教训）：`restart_gateway.sh`被系统cron每天触发6次（08:55/09:25/11:55/13:25/15:25/17:00），导致频繁打断会话。**根因**：Pantalone skill中写了"系统crontab三重重启确保ticker鲜活"，但cron条目过多。**修复**：因crontab无root权限修改（sudo setuid位丢失），改用脚本内时间门控：`HOUR=$(date '+%H'); if [ "$HOUR" != "03" ]; then exit 0; fi`。**sudo修复**：需腾讯云VNC登录→`chmod 4755 /usr/bin/sudo`。详见`references/gateway-cron-troubleshooting.md`。
 31. **amadeus_emotion.py过期检测**：v2.0增加缓存文件日期检查，如果今日数据缺失会降级到最近文件并标注`data_freshness: "stale"`+`stale_warnings`。报告中必须检查此字段
@@ -508,7 +506,6 @@ pytest ~/.hermes/scripts/amadeus/tests/test_pantalone_data.py -v
 66. **B池膨胀必须主动精简**（2026-05-26教训）：B池>50只时必须主动精简，保留前50只（按浮盈排序），移出其余至退池。不能等用户指示。清理后必须同步更新session_context.json和pool_state.json。
 67. **止损判断必须验证实际数据**（2026-05-26教训）：报告中的止损判断可能错误（如"中信证券止损连续4天未执行"实际浮亏-3.46%未触发-5%止损线）。止损判断必须：①读取pool_state.json或session_context.json中的实际浮亏 ②与止损线比较（A池-10%/B池-5%/C池-3%） ③只有实际触发才报告"止损触发"。不能依赖报告中的错误判断。
 68. **Cron限流规则强化**（2026-05-26教训）：微信推送间隔≥10分钟（2026-05-27实测5分钟不够）。收盘后任务密集排布：ML信号15:20→收盘复盘15:30→ML模拟盘15:40→观察池15:50。盘中异动监控改为每小时（10:00/12:00/14:00），不再每30分钟。**Discord已配置为主推送渠道**（2026-05-27迁移），微信仅交互不推送。
-69. **docx发送必须写明具体步骤**（2026-05-27教训）：cron prompt只写"完整版走docx"不够，agent不知道怎么执行。必须写明第四步：①保存markdown文件 ②运行to_docx.py ③回复中包含MEDIA:标签。否则agent只说"已生成docx"但不实际发送。
 70. **收盘复盘v3模板**（2026-05-27升级）：参考行业最佳实践报告，新增30秒速读/预测命中率(x/y=z%)/规则系统R-xx/股票池五级分类/明日继承项/盘中策略验证/主线独立跟踪/数据源逐项标注。详见`templates/review_template.md`、`references/rule-system.md`、`references/inheritance-system.md`。
 69. **docx发送必须写明完整操作步骤**（2026-05-27教训）：cron prompt中只写"完整版转.docx通过MEDIA:发送"是不够的——cron agent看到这句话但不知道怎么执行。必须在prompt中增加明确的**第四步**：①将完整报告保存为markdown文件 ②运行`cat <报告文件> | python3 ~/.hermes/scripts/amadeus/to_docx.py "标题" ~/.hermes/cache/amadeus/<报告名>_$(date +%Y%m%d).docx` ③在最终回复中包含`MEDIA:/home/ubuntu/.hermes/cache/amadeus/<报告名>_$(date +%Y%m%d).docx`。所有报告类cron（早报/午盘/收盘/周报）的prompt都必须包含这个显式步骤。
 
