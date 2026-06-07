@@ -1,0 +1,83 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Virtual environments
+venv/
+.venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Sensitive data - NEVER commit
+*.env
+.env.*
+config.yaml
+config.yml
+secrets.*
+*.key
+*.pem
+*.token
+
+# Cache and temporary files
+cache/
+*.json.bak
+*.tmp
+tmp/
+temp/
+
+# ML models (large files, host separately)
+ml_models/
+*.pkl
+*.joblib
+*.h5
+*.onnx
+
+# Data files
+*.csv
+*.parquet
+*.hdf5
+data/
+
+# Logs
+*.log
+logs/
+
+# Hermes agent internals
+session_context.json
+pool_state.json
+pool_changes.log
+decision_log.json
+inheritance_latest.md
+market_*.json
+emotion_*.json
+realtime_*.json
+news_latest.json
+quant_knowledge.md
+
+# DOCX output
+*.docx
+
+# Test artifacts
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Vector DB
+chroma_db/
+vector_db/

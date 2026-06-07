@@ -27,14 +27,29 @@
 ### 投资研究类任务（盘前/午盘/收盘）
 
 ```
-1. Market Data Agent → 获取行情数据
-2. Research Agent → 收集政策/新闻/报告
-3. Financial Agent → 分析财报数据
-4. Theme Agent → 扫描题材/板块
-5. Technical Agent → 分析技术面
-6. Risk Agent → 风险审查
-7. Report Agent → 汇总生成报告
+第1批并行（3个）：
+  1. Market Data Agent  → 情绪温度+板块资金流+大盘信号+北向分钟流
+  2. Capital Agent      → 龙虎榜席位+融资融券+大宗交易 [新增]
+  3. Macro Agent        → 外围市场+宏观环境
+
+第2批并行（3个）：
+  4. Theme Agent        → 同花顺热点归因+行业排名+新闻+题材
+  5. Financial Agent    → 财报分析+分红送转
+  6. Technical Agent    → 技术面分析
+
+第3批（依赖前两批结果）：
+  7. Risk Agent         → 排雷扫描+筹码分析(股东户数/解禁/大宗)
+  8. Research Agent     → 研报评级+公告（按需，个股深度分析时启用）
+
+汇总：
+  9. Report Agent       → 汇总生成报告
+  10. Review Agent      → 独立审查（delegate_task，不可自我审查）
 ```
+
+> **并行规则**：delegate_task batch上限3个，分3批执行。
+> **Capital Agent是新增**：从Market Data拆分出的资金面/机构动向分析，避免Market Data超载。
+> **Risk Agent增强**：新增筹码分析（股东户数/限售解禁/大宗交易），排雷清单从5项扩展到9项。
+> **Theme Agent增强**：主数据源从新闻爬虫升级为同花顺热点归因tags。
 
 ### ETF 分析类任务
 
@@ -247,7 +262,7 @@ L3/L4 任务必须包含执行摘要：
 | 示例 | 复杂度 | 模型 | Subagent | 是否确认 |
 | --- | --- | --- | --- | --- |
 | 解释债券久期 | L0 | 小米 | Research Agent | 否 |
-| 今日 A 股早报 | L3 | DeepSeek | Market Data / Financial / Theme / Technical / Risk / Report | 除非修改或推送，否则否 |
+| 今日 A 股早报 | L3 | DeepSeek | Market Data / Capital / Macro / Theme / Financial / Technical / Risk / Report | 除非修改或推送，否则否 |
 | 修改 SOUL.md | L4 | DeepSeek | Research / Code-Ops / Risk | 必须确认 |
 | 只读检查日志 | L1 | 小米 | Ops Agent | 否 |
 | Gateway 中断恢复 | L4 | DeepSeek | Ops / Code / Risk | 只读无需确认，修改前必须确认 |

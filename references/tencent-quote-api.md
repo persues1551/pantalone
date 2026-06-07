@@ -68,6 +68,30 @@ name, price, change_pct = fields[1], fields[3], fields[32]
 - GBK编码需转码
 - 字段位置固定但数量多，需精确解析
 - 非官方API，可能随时变更
+- **⚠️ 不提供MA数据**：字段6-9是成交量/买卖盘数据，**不是**MA5/MA10/MA20/MA30。计算MA需用新浪K线API获取历史数据后自行计算（见下方）
+
+## 历史K线数据（新浪API）
+
+腾讯实时API无历史数据。计算MA50/MA120需用新浪K线API：
+
+```bash
+# 获取130天日K线（含open/high/low/close/volume）
+curl -s "https://quotes.sina.cn/cn/api/jsonp_v2.php/var/CN_MarketDataService.getKLineData?symbol=sh601899&scale=240&ma=no&datalen=130"
+
+# 返回格式：var([{day,open,high,low,close,volume},...]);
+# 用正则提取JSON：re.search(r'var\((.+)\);', output)
+# 计算MA：取close字段求均值
+```
+
+**代码示例**：
+```python
+import json, re, requests
+r = requests.get(f"https://quotes.sina.cn/cn/api/jsonp_v2.php/var/CN_MarketDataService.getKLineData?symbol=sh601899&scale=240&ma=no&datalen=130")
+klines = json.loads(re.search(r'var\((.+)\);', r.text).group(1))
+closes = [float(k["close"]) for k in klines]
+ma50 = sum(closes[-50:]) / 50
+ma120 = sum(closes[-120:]) / 120
+```
 
 ## 触发条件
 

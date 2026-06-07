@@ -1,6 +1,6 @@
 ---
 name: pantalone
-description: "Pantalone投研模块 v3.7 — 投资研究+科研论文+学术写作+公文材料+商业分析+数据分析+代码辅助+学习规划。OCIFQ选股体系（寡头定价权×长周期催化×行业利润断层×财务三爆×连续季报验证）+Pantalone择时双轨制+ML六维评分。ETF分析能力v3.5：9类分类+25字段+A-E评级+A/B/C池+18风险检查+OCIFQ持仓评估。ML集成模型v5.1：LightGBM+XGBoost集成AUC 0.6512（727只股票/606K样本/66特征）。ML模拟盘验证系统+止损自动监控。量化信号层：ML30%+因子25%+技术20%+情绪15%+资金10%。核心原则：诚实优于舒适、实质优于表演、数据先行、先查再想、排雷优先、纪律大于判断。灵魂文档：SOUL.md(790行)。模块化架构：router.md→workflow.md→subagents/(17文件含etf/etf_reviewer)→rules/(9文件)→templates/(6文件含etf_analysis)→references/(50+文件含ocifq-framework)。Subagent执行能力v3.5：7个subagent(market_data/technical/macro/theme/risk/etf/etf_reviewer)+独立审查review，cron报告自动经delegate_task审查。ETF数据采集：东方财富pushapi+fundgz+pingzhongdata（AKShare ETF hist连接不稳）。Research Agent引擎：amadeus_research.py（假设生成+证据收集+5角色评审）。模拟盘规则v3：量化评分系统(满分100/门槛60)/分批建仓(50%+确认)/三层清仓(均线+分批止盈+时间窗口)/大盘四级过滤器。不构成投资建议。"
+description: "Pantalone v3.7 — 投资研究系统。OCIFQ选股(寡头定价权×长周期催化×行业利润断层×财务三爆×连续季报)+Pantalone择时双轨制+ML六维评分(OCIFQ70%+ML30%)。ETF分析v3.5：9类分类+25字段+A-E评级。ML集成LightGBM+XGBoost(AUC 0.6512)。量化信号层：ML30%+因子25%+技术20%+情绪15%+资金10%。核心原则：诚实优于舒适、实质优于表演、数据先行、排雷优先、纪律大于判断。模块化架构：SOUL.md→router.md→workflow.md→subagents/(17文件)→rules/(9文件)→templates/(6文件)→references/(50+文件)。7个subagent+独立审查。模拟盘：量化评分(满分100)/分批建仓/三层清仓/大盘四级过滤。不构成投资建议。"
 version: 3.5.0
 ---
 
@@ -20,15 +20,17 @@ version: 3.5.0
 **收盘复盘模板v3**：`templates/review_template.md`（30秒速读/预测命中率/规则系统/五级股票池/继承项/数据源逐项标注）
 **止损自动监控**：`scripts/amadeus/stop_loss_monitor.py`（A池-10%/B池-5%/C池-3%，每天15:00自动检查）
 **止损确认与告警**：`references/stop-loss-and-pool-rules.md`（止损确认机制+滞后告警+入池OCIFQ强制）
+**决策日志系统**：`~/.hermes/cache/amadeus/decision_log.json`（预判→验证→命中率→改进闭环。晚间复盘写入预判，收盘复盘验证前日预判+写入新预判。详见self-improvement skill的Section十七+`references/investment-iteration-guide.md`）。**JSON结构**：顶层keys=`version/created/entries/stats`，`entries`是数组（非predictions），每条entry=`{id, date, type, prediction, confidence, status, source, target?, verified_date?, result?}`，`stats`=`{total_predictions, verified, hits, misses}`。读取时用`terminal("cat file")`而非`read_file`（后者带行号前缀LINE_NUM|CONTENT，JSON解析需额外处理）。**详细结构**：`references/decision-log-structure.md`
 **Gateway故障排查**：`references/gateway-cron-troubleshooting.md`（PATH问题+超时修复+渠道迁移）
 **风险整改自动化流程**：`references/risk-rectification-process.md`（2026-05-26：自动整改报告中的风险项目）
 
 **数据管线审计**：`references/data-pipeline-audit.md`（2026-05-20完整审计：数据源分类/缺失脚本/降级链路/验证缺口）
 **工作流审计报告**：`references/workflow-audit-20260515.md`（5个严重问题+修复清单+防复发机制）
+**a-stock-data-supp集成记录**：`references/a-stock-data-integration.md`（2026-06-03：端点实测结果/架构变更/集成方法论）
 **Subagent并行架构**：`references/subagent-execution-flow.md`（v3.4并行delegate_task流程）+ `references/subagent-protocol-v3.4.md`（角色映射+陷阱）
 **ETF数据采集**：`references/etf-data-collection.md`（AKShare ETF接口坑+东方财富备用API+18只ETF实测数据源）
 **Datasette集成**：`references/datasette-setup.md`（安装/示例数据库/JSON API/集成方案）
-**开源工具集成**：`quant-ml-training` skill（ML训练流水线+Qlib/OpenBB/FinRL集成+因子分析）
+**开源工具集成**：`references/quant-ml-integration-guide.md`（ML训练流水线+Qlib/OpenBB/FinRL集成+因子分析+详细代码示例+特征工程+模型版本历史）
 **量化信号模块**：`scripts/amadeus/pantalone_tools_hub.py`（综合信号：ML+RL+因子+技术面）
 **向量搜索模块**：`references/vector-search-setup.md`（chromadb+sentence-transformers，语义搜索session历史）
 **ML训练最佳实践**：`references/ml-training-best-practices.md`（2026-05-25：v3.5 AUC数据泄露教训、数据源对比、训练配置、38特征列表、OCIFQ+ML整合、模拟盘系统）
@@ -41,6 +43,9 @@ version: 3.5.0
 **ML模拟盘验证系统**：`references/ml-simulation-system.md`（模拟交易/回测引擎/每日检查/定时任务）
 **情绪温度数据管线**：`references/emotion-data-pipeline-fix.md`（2026-05-20修复：连板/成交额字段映射）
 **数据质量等级指南**：`references/data-quality-guide.md`（data_quality.py用法/等级规则/嵌入报告方式/pitfall）
+**数据缺口处理指南**：`references/data-gap-handling.md`（新闻超时/北向缺失/pool为空/板块失败时的报告标注规范）
+**JSON缓存文件结构**：`references/json-cache-structures.md`（market/pool_state/emotion/global四个缓存文件的完整字段说明+pitfalls，cron读取前必看）
+**Cron Prompt提取方法**：`references/cron-prompt-extraction.md`（从jobs.json提取prompt的正确方法，避免unicode转义陷阱）
 **数据质量系统详细文档**：`references/data-quality-system.md`（8项核心数据/cache加载逻辑/等级规则/pitfall/与其他模块关系）
 **Pool Manager数据源降级**：`references/pool-manager-fallback.md`（4级降级梯队/调用点/pitfall/类推教训）
 **Tushare接口清单**：`references/tushare-interfaces.md`（120积分可用/不可用接口+替代方案）
@@ -66,6 +71,30 @@ version: 3.5.0
 投研SOUL.md新增：
 - **4.15节 OCIFQ选股体系**：行业印钞机公式+五维评分+双轨评分
 
+## 开源发布状态（2026-06-07）
+
+Pantalone计划开源到GitHub，用于获取OpenAI Codex for Open Source奖励。
+
+**已生成的开源文件**（位于`skills/investment/pantalone/`）：
+- README.md — 项目介绍、安装、使用、架构
+- LICENSE — MIT许可证
+- CONTRIBUTING.md — 贡献指南
+- .gitignore — 排除缓存/密钥/模型/日志
+- .env.example — API key配置模板
+- pyproject.toml — Python项目元数据
+- requirements.txt — 依赖清单
+- SECURITY_AUDIT.md — 安全审查报告（内部用，推送前删除）
+
+**安全审计发现**：
+- 🔴 dspy_optimize_skill.py第10行硬编码DeepSeek API key（sk-0877...），必须删除或改为环境变量
+- ⚠️ SKILL.md含Discord channel ID和/home/ubuntu路径，需要清理
+- ⚠️ 缓存文件（pool_state.json等）已在.gitignore中排除
+
+**待办**：
+- 主人提供GitHub Token后执行：gh auth login → 清理敏感数据 → gh repo create --public --push
+
+**详细工作流**：`github-open-source-release` skill
+
 ## 环境
 
 - Python：`/usr/bin/python3`（系统Python）
@@ -78,6 +107,11 @@ version: 3.5.0
 **OCIFQ+ML整合选股**：`scripts/amadeus/ocifq_ml_selector.py`（六维评分：OCIFQ 70% + ML 30%）
 **ML训练经验**：`stock-picking/references/ml-training-lessons.md`（特征质量>数据数量、数据源降级策略）
 **止损自动监控**：`scripts/amadeus/stop_loss_monitor.py`（A池-10%/B池-5%/C池-3%，每天15:00检查）
+**达尔文评估报告**：`references/darwin-evaluation-20260528.md`（9维评分60.4→64.0，待优化：dim7整体架构需探索性重写）
+**达尔文使用指南**：`references/darwin-skill-guide.md`（安装/流程/9维度/实战经验）
+**电力板块研究**：`references/power-sector-research-20260528.md`（电力+电网设备估值对比、OCIFQ评分、持续性判断）
+**实用技术分析双框架**：`references/ta-left-right-framework.md`（左侧MA120/MA50+低PE高股息、右侧放量突破，来自实战总结）
+**持仓诊断流程**：`references/portfolio-diagnosis-workflow.md`（逐只分析→重叠检测→集中度→调仓建议，含ETF重叠检测方法）
 
 ## 已接入
 
@@ -86,6 +120,7 @@ version: 3.5.0
 - Tushare脚本：`tushare_data.py`（north/daily/shibor/cyq/top10/all），venv Python运行
 - humanizer-zh：中文去AI痕迹
 - 8个Pantalone技能（chanlun/sentiment/valuation/risk/sector-rotation/earnings/behavioral/seasonal）
+- **a-stock-data-supp**：A股数据补充层（龙虎榜席位/融资融券/大宗交易/股东户数/分红送转/限售解禁/行业排名/同花顺热点归因/北向分钟流/东财研报/巨潮公告），13个端点，东财datacenter内置em_get限流防封。路径：`skills/investment/a-stock-data-supp/`，CLI：`scripts/a_stock_data_supp.py`
 
 ## 开源工具集成（2026-05-24新增）
 
@@ -268,12 +303,14 @@ python3 ~/.hermes/scripts/amadeus/pantalone_tools_hub.py --comprehensive --stock
 | amadeus_realtime.py | 腾讯API+AKShare | 实时行情+技术指标（MA/MACD/RSI/布林带） |
 | amadeus_indicators.py | AKShare | MA/MACD/RSI/布林带（批量计算） |
 | amadeus_financials.py | 同花顺+巨潮 | 财报 |
-| amadeus_news_scanner.py | 东方财富/财联社/新浪/同花顺 | 新闻4源260条 |
+| amadeus_news_scanner.py | 东方财富/财联社/新浪/同花顺 | 新闻4源260条（⚠️无JSON输出，详见`references/news-scanner-cli.md`） |
 | amadeus_sector_flow.py | 同花顺 | 板块资金流（独立入口+自动单位核验） |
 | amadeus_etf_pool_manager.py | 新浪API+AKShare | ETF观察池管理（ABC池/退池/入池/止损/18项风险） |
 | tushare_data.py | Tushare Pro(venv) | 北向资金(最稳)、SHIBOR利率、筹码分布、北向十大活跃、个股日线 |
+| **a_stock_data_supp.py** | **东财datacenter+同花顺+腾讯+巨潮** | **龙虎榜席位、融资融券、大宗交易、股东户数、分红送转、限售解禁、行业排名、热点归因、北向分钟流、研报、公告（13端点，东财内置em_get限流）** |
 
 **优先级**：amadeus_data → AKShare → 腾讯行情API → Tushare → Ashare → Tavily
+**a_stock_data_supp.py优先级**：腾讯行情 → 同花顺热点/北向 → 巨潮公告 → 东财datacenter（有风控，走em_get限流）
 
 ### 统一验证模块 data_validator.py
 
@@ -356,21 +393,6 @@ pytest ~/.hermes/scripts/amadeus/tests/test_pantalone_data.py -v
 - **发送前自检**：内容干净（无代码/skill元数据）？有REPORT标记？完整版走docx？
 - **推送渠道**：Discord为主（channel ID:1509184957245948014），微信仅交互不推送
 
-## ⚠️ Cron Docx发送必须有显式步骤（2026-05-27教训）
-
-**问题**：prompt只写"完整版转.docx通过MEDIA:发送"，cron agent不知道怎么执行，只写了句"已生成docx"就结束了。
-
-**修复**：cron prompt必须包含**显式的第四步**，不能只在输出规范里提一句：
-
-```
-## 第四步：生成docx并发送（必须执行）
-1. 将完整报告保存为markdown文件
-2. 运行 `cat <报告文件> | python3 ~/.hermes/scripts/amadeus/to_docx.py "报告标题" ~/.hermes/cache/amadeus/report_$(date +%Y%m%d).docx`
-3. 在最终回复中包含 `MEDIA:/home/ubuntu/.hermes/cache/amadeus/report_$(date +%Y%m%d).docx`
-```
-
-**铁律**：cron prompt中提到的每个动作必须有可执行的命令，不能只写意图。"完整版走docx"是意图，不是指令。
-
 ## 发送前自检清单（每次输出必须执行）
 
 1. 内容干净？（无代码块、bash命令、python脚本、skill元数据）
@@ -402,7 +424,7 @@ pytest ~/.hermes/scripts/amadeus/tests/test_pantalone_data.py -v
 | Gateway重启打断会话 | 等重启完成后恢复 | 检查restart_gateway.sh时间门控 |
 | sudo setuid损坏 | chmod 4755 /usr/bin/sudo | 用VNC登录腾讯云控制台修复 |
 
-## 常见坑（Top 10）
+## 常见坑
 
 1. **报告过大导致Gateway假死**：50-75KB报告分30+chunk触发iLink限流→event loop崩溃。修复：摘要+docx
 2. **to_docx.py从stdin读取**：`cat file.md | python3 to_docx.py "标题" output.docx`
@@ -414,103 +436,99 @@ pytest ~/.hermes/scripts/amadeus/tests/test_pantalone_data.py -v
 8. **高价股被单票上限误拦**：上限取max(25%,1手金额)
 9. **Cron缺delegation工具集**：delegate_task不可用→subagent永不执行。修复：所有cron必须加`delegation`到enabled_toolsets
 10. **分析必须全量调取数据**：不能只看规则文件，必须同时调取历史回放数据、观察池表现、交易记录、板块数据
-11. **止损判断必须验证实际数据**（2026-05-26教训）：报告中的止损判断可能错误（如"中信证券止损连续4天未执行"实际浮亏-3.46%未触发-5%止损线）。止损判断必须：①读取pool_state.json或session_context.json中的实际浮亏 ②与止损线比较（A池-10%/B池-5%/C池-3%） ③只有实际触发才报告"止损触发"。不能依赖报告中的错误判断。
-12. **风险整改必须自动执行**（2026-05-26教训）：收盘复盘报告中发现的风险问题（止损未执行、池子膨胀、违规操作等）必须自动整改，不能只报告不执行。用户原话："风险评估内容中的项目都自动整改"。整改流程详见`references/risk-rectification-process.md`。
-13. **B池膨胀必须主动精简**（2026-05-26教训）：B池>50只时必须主动精简，保留前50只（按浮盈排序），移出其余至退池。不能等用户指示。清理后必须同步更新session_context.json和pool_state.json。
-14. **Cron docx发送必须有显式步骤**（2026-05-27教训）：prompt只写"完整版走docx"，cron agent不知道怎么执行。修复：prompt中加显式第四步（cat报告|to_docx.py→MEDIA:发送）。cron prompt中提到的每个动作必须有可执行命令，不能只写意图。
-15. **渠道级限流导致全部推送失败**（2026-05-27教训）：微信iLink限流是渠道级的，一旦触发后续所有消息都被挡。6个任务在30分钟内执行→全部失败。修复：所有任务间隔≥5分钟，同一小时最多3个推送任务。详见`references/cron-schedule-optimized.md`。
-11. **自我审查反模式**：Agent默认会自己审查自己的报告（读文件→说"看起来不错"→发送）。必须在prompt中写"不可自己审查，不可跳过"
-12. **amadeus_research.py字段不兼容**：session文件用`session_id`非`id`，depth存为字符串。已修复
-13. **修改cron未确认**：SOUL.md 15.2要求cron修改必须确认。必须先输出变更清单等主人确认
-14. **单轮多任务**：SOUL.md 15.4要求每轮只做一个主任务。用todo管理多步骤
-15. **工具调用重复**：同一文件读3-4次浪费token。首次读取后缓存结果
-16. **压缩摘要不可信**：上下文压缩可能记录"已完成"但实际未做。压缩后必须验证关键文件
-17. **自己审查自己**：报告类输出必须delegate_task独立审查，不可自我审查
-18. **delegate_task batch上限3**：5个subagent必须分2批（3+2），不能一次传5个tasks
-19. **amadeus_sector_flow.py已存在**（2026-05-21更正）：`~/.hermes/scripts/amadeus/amadeus_sector_flow.py`存在且可用。板块资金流有两个入口：①amadeus_sector_flow.py（独立脚本，带自动单位核验）②amadeus_data.py的collect_sector_flow()（集成在数据采集中）。cron午间复盘prompt引用的是amadeus_sector_flow.py，路径正确
-20. **审查发现critical必须修正**：不能忽略审查结果，critical问题必须修正后重审通过才能发送
-21. **AKShare fund_etf_hist_em连接不稳**：循环获取19只ETF历史数据时全部RemoteDisconnected。备用方案：东方财富pushapi（实时行情）+ fundgz（净值估算）+ pingzhongdata（费率/指数/基金公司）
-22. **execute_code内report生成脚本**：写到scratchpad用terminal执行比inline execute_code可靠。但大量数据的report脚本print到stdout可能timeout→直接write_file到cache目录
-23. **f-string不能含反斜杠**：Python 3.11 f-string内不允许`\\`，用%格式化或先赋值变量替代
-24. **execute_code 50 tool call limit**：batch操作（如批量退池50+只股票）必须分批执行，每批≤50次terminal调用。先计数再分批，不要在中途被截断
-25. **"执行退池"= run auto**：用户说"执行退池"时直接跑`auto`（退池+入池一步到位），不要拆成scan+apply再等用户追问"入池也执行"
-25. **池子膨胀必须主动精简**：B池>15只时按主题分类保留龙头，不需要等用户指示。execute_code批量remove+直接改context做C→B升级
-26. **语言强制必须在cron prompt首尾各写一次**（2026-05-22教训）：模型生成长报告时默认用英文。修复：prompt开头加"全程必须用中文"，输出规范末尾再加一次。不能只在SKILL.md里写，cron agent不一定加载
-27. **humanizer必须在cron prompt中显式执行**（2026-05-22教训）：SKILL.md写了规则但cron agent不会主动遵循。修复：cron prompt中加显式步骤`python3 humanize_auto.py <文件> --inplace`。to_docx.py已内建humanizer（docx自动处理），但摘要文本需要单独处理
-28. **docx发送必须在cron prompt中写明第四步**（2026-05-27教训）：prompt只写"完整版走docx"不够，cron agent不知道怎么操作。必须在prompt中增加明确的**第四步**：①保存markdown ②运行`to_docx.py` ③回复中包含`MEDIA:`标签。否则cron agent只输出"已生成docx"但不实际发送
-26. **ETF池管理与个股池独立**：etf_notes和stock_notes是context中独立字段，用不同的manager脚本。ETF池有差异化止损（按ETF类型）、折溢价检查、流动性门槛（日成交额<500万警告）
-27. **amadeus_emotion.py过期检测已完善**（2026-05-21更新）：v2.0增加limit/indices缓存文件日期检查。v3.0(2026-05-21)补齐load_market_extra()的过期检测——原逻辑无日期检查且不降级到旧文件，现已与load_limit_data/load_index_data一致：今日文件→降级最新文件(标记stale)→返回None。三个数据源(涨跌停/指数/市场扩展)的过期状态均注入stale_warnings字段。报告中必须检查data_freshness字段
-28. **无交叉数据验证**：脚本层各数据源独立采集，没有自动对比"新浪vs腾讯vs东方财富"的机制。review subagent检查格式但不做数值交叉验证。
-29. **板块资金流单位待验**：同花顺 `stock_board_industry_summary_ths()` 返回值可能是万元非亿元，至今未与东方财富数据交叉核验。
-30. **AKShare fund_etf_spot_em()慢但数据全**：~27秒获取1467只ETF全量数据（折溢价/换手率/量比/份额/主力净流入）。日常scan用Sina API（秒级），详细风险检查才调AKShare
-28. **ETF入池来源**：个股池入池靠新闻扫描器的stocks_mentioned字段，ETF入池靠sectors字段映射到板块→ETF代码表（sector_to_etf映射表在etf_pool_manager.py中）
-29. **精简池子的execute_code策略**：batch remove用terminal调pool_manager.py remove，但C→B升级需要直接改session_context.json（因为pool_manager没有upgrade命令）。注意execute_code 50 call limit，50+只股票分批
-30. **humanizer篡改事实数据（2026-05-27发现）**：`humanize_auto.py --inplace`不仅改风格，还会篡改具体数字、股票代码、数据等级。2026-05-27晚间复盘中，北向40.75亿→39.47亿，粤电力A→京能电力，数据等级C→B。修复：humanize后必须校验关键数据（指数/涨跌幅/板块流/个股代码/数据等级），发现篡改立即回滚。详见`references/humanizer-factual-errors.md`。
-31. **安全扫描阻止pipe到python3**：cron job中`cat file | python3 script.py`会被安全扫描拦截。替代方案：用`execute_code`的`subprocess.run()`传入stdin，或用`python3 -c "exec(open('file').read())"`模式。`to_docx.py`和`humanize_auto.py`的管道调用都受影响。
-32. **腾讯API返回GBK编码**：qt.gtimg.cn返回的中文是GBK编码，不能用text=True。必须用`result.stdout.decode('gbk', errors='replace')`。已在amadeus_realtime/amadeus_market_filter/amadeus_sim_integrate/amadeus_external中修复
-31. **安全扫描阻止pipe到python3**：cron job中`cat file | python3 script.py`会被安全扫描拦截。替代方案：用`execute_code`的`subprocess.run()`传入stdin，或用`python3 -c "exec(open('file').read())"`模式。`to_docx.py`和`humanize_auto.py`的管道调用都受影响。：qt.gtimg.cn返回的中文是GBK编码，不能用text=True。必须用`result.stdout.decode('gbk', errors='replace')`。已在amadeus_realtime/amadeus_market_filter/amadeus_sim_integrate/amadeus_external中修复
-32. **Gateway重启≠会话重置**（2026-05-28教训）：用户说"为什么重启"时，不要假设是"每日定时重置会话"。必须先查gateway日志确认原因。`grep "Stopping gateway" ~/.hermes/logs/gateway.log`看是否有主动重启，`journalctl`看cron触发。会话重置是Hermes内部机制（无日志），Gateway重启有明确日志记录。
-33. **Gateway重启频率诊断与修复**（2026-05-28教训）：`restart_gateway.sh`被系统cron每天触发6次（08:55/09:25/11:55/13:25/15:25/17:00），导致频繁打断会话。**根因**：Pantalone skill中写了"系统crontab三重重启确保ticker鲜活"，但cron条目过多。**修复**：因crontab无root权限修改（sudo setuid位丢失），改用脚本内时间门控：`HOUR=$(date '+%H'); if [ "$HOUR" != "03" ]; then exit 0; fi`。**sudo修复**：需腾讯云VNC登录→`chmod 4755 /usr/bin/sudo`。详见`references/gateway-cron-troubleshooting.md`。
-31. **amadeus_emotion.py过期检测**：v2.0增加缓存文件日期检查，如果今日数据缺失会降级到最近文件并标注`data_freshness: "stale"`+`stale_warnings`。报告中必须检查此字段
-32. **板块资金流列名变化**：同花顺接口列名可能是`板块`而非`板块名称`，amadeus_sector_flow.py和amadeus_data.py已做兼容处理
-33. **Tushare在venv中**：Tushare安装在hermes-agent venv（`~/.hermes/hermes-agent/venv/bin/python3`），不在系统Python。`tushare_data.py`通过subprocess调用venv Python。120积分可用：daily/moneyflow_hsgt/shibor/cyq_perf/ggt_top10/hsgt_top10/stock_basic/index_basic。不可用：index_daily/daily_basic/trade_cal/margin_detail/stk_limit/ths_*/cn_gdp/cn_cpi
-34. **data_validator.py异常值检测**：所有数据采集脚本共用。北向资金NaN/0.0→Tushare降级；市场总貌<1000只→返回None；指数price<=0→跳过；汇率超出[5,10]→null。新脚本必须import并使用，不可跳过验证
-34. **amadeus_emotion.py数据格式不匹配**：情绪脚本读`limit_up_stocks`中的`连板数`字段不存在（实际连板在`lianban[].board_count`），读`index_data.volume`不存在（实际成交额在`market.total_amount`万亿）。修复：新增`load_market_extra()`从market_*.json读取连板+成交额，`calc_emotion()`新增`market_extra`参数
-35. **AKShare stock_zh_a_spot()瞬时故障**：偶尔只返回80只股票（应5000+），导致市场总貌全部失真。amadeus_data.py无校验机制。建议：采集后校验`len(df) > 1000`，否则重试或降级
-36. **板块资金流列名变化**：同花顺接口列名可能是`板块`而非`板块名称`，amadeus_sector_flow.py和amadeus_data.py已做兼容处理
-37. **integrate-news不自动入池（2026-05-21修复）**：原`integrate-news`只生成候选建议但不调用`add_stock()`，导致6天只退不进。修复：在`suggestions`循环中自动调用`add_stock(code, pool, reason)`，并添加过滤条件（跳过情绪<0的大跌股、无法获取行情的、已在池中的）。测试：修复后一次入池36只→20只（过滤后）
-38. **Cron任务撞限流（2026-05-22大规模复盘）**：同一时间触发多个cron会导致微信iLink限流，后发的任务delivery失败。**所有**报告类cron必须间隔≥10分钟（2026-05-27实测5分钟不够）。2026-05-22教训：14个job中7个被限流。修复：优化后时间表见`references/cron-schedule-optimized.md`。诊断方法：`cronjob list`看`last_delivery_error`字段（job可能显示status:ok但delivery失败）。补发方法：读`~/.hermes/cron/output/<job_id>/`最新文件，手动send_message补发。**渠道级限流根本解法**：多渠道备份（Discord已配置为主推送渠道，2026-05-27迁移）。
-39. **数据质量等级制度**（2026-05-21新增）：`data_quality.py`统一评估8项核心数据的完整性+新鲜度+来源可靠性，输出A/B/C+/C/D/F等级。报告模板要求在正文第一段粘贴data_quality.py --report-fragment输出。等级低于C+必须加降级警告。D/F级数据不得进入正式胜率统计。Cron三个主报告(早盘/午间/收盘)已更新，在数据采集后强制运行data_quality.py
-40. **报告必须标注数据来源**（2026-05-21新增）：每份报告的每个数据点必须标明来源类型：结构化接口(今日)/结构化接口(过期)/web_search/LLM推理/缺失。禁止把web_search或LLM推理的数据伪装成结构化接口数据。data_quality.py自动标注各项数据来源
-41. **pool_manager.py数据源降级梯队**（2026-05-21新增）：原scan_pool/report只用新浪API，新浪挂了全部股票显示"无法获取行情"。现已改为4级降级：新浪→腾讯API→AKShare(stock_zh_a_spot)→Ashare。每级只处理上一级缺失的股票，减少API调用。返回值从prices_dict改为(prices_dict, source_name, missing_codes)。check_minefield()仍用fetch_sina_prices（单只查询，暂不改）
-42. **复盘自动改进闭环**（2026-05-21新增）：收盘复盘**每次**都从扣分项/失败项/优化项中提取改进动作→保存到`improvement_pending.json`→下期盘前早报必须列出待执行项→下期收盘复盘必须检查完成情况。不论分数高低，有问题就改进。连续两天同一条未完成标为🔴严重违规。盘前早报和收盘复盘的prompt已加"第零步：检查上期改进TODO"
-43. **备份job改local保存**（2026-05-21新增）：3个容错备份job(盘前/午间/收盘)的deliver从origin改为local。备份不再重试微信（渠道级限流备份照样被挡），改为保存到本地文件，主job delivery失败时由Amadeus手动补发
-42. **备份cron不能解决渠道级限流**（2026-05-21发现）：收盘复盘主job和备份job都被微信限流。备份job只是同一渠道重发，限流是渠道级的，备份照样被挡。备份应改为local保存（不发微信），由Amadeus手动补发，或用其他渠道
-44. **pool_manager.py remove_stock OCIFQ误拦**（2026-05-28修复）：`remove_stock`函数被`ocifq_enforce.py`注入了OCIFQ评分检查，导致合法退池操作被拒绝（如002535林州重机立案调查退池）。修复：删除remove_stock中的OCIFQ检查块。**铁律：OCIFQ检查只应用于add_stock，不应用于remove_stock。**
-45. **情绪温度市场宽度因子阈值跳跃**（2026-05-28修复）：原模型用`>100/>80/>50/>30`阈值判断宽度，跳跃太大导致18分偏差（预测49 vs 实际36）。修复：改用连续函数`width_score = min(25, zt/120*25)`，有真实上涨家数时优先用`breadth_pct = up/(up+down)*100`。
-46. **Humanizer双重存在**（2026-05-28梳理）：`humanize_auto.py`（规则引擎，5/22安装）和`humanizer-zh SKILL.md`（参考规则库，5/28安装）是两套东西。to_docx.py内建调用humanize_auto.py。SKILL.md作为深度润色参考。humanize_auto.py已知会篡改事实数据，详见`references/humanizer-factual-errors.md`。
+11. **止损判断必须验证实际数据**（2026-05-26教训）：必须①读取pool_state.json实际浮亏 ②与止损线比较（A池-10%/B池-5%/C池-3%） ③只有实际触发才报告。不能依赖报告中的错误判断。
+12. **风险整改必须自动执行**（2026-05-26教训）：收盘复盘中风险问题必须自动整改（清理池子、执行止损、更新状态），不能只报告不执行。详见`references/risk-rectification-process.md`。
+13. **B池膨胀必须主动精简**（2026-05-26教训）：B池>50只时保留前50只（按浮盈排序），移出其余。同步更新session_context.json和pool_state.json。
+14. **Cron docx发送必须有显式步骤**（2026-05-27教训）：cron prompt必须写明第四步：①保存markdown ②运行to_docx.py ③回复含MEDIA:标签。不能只写意图不写指令。
+15. **渠道级限流导致全部推送失败**（2026-05-27教训）：微信iLink渠道级限流，6个任务30分钟内全部被挡。修复：任务间隔≥10分钟，Discord为主推送渠道。详见`references/cron-schedule-optimized.md`。
+16. **自我审查反模式**：Agent默认读自己报告→说"看起来不错"→发送。必须在prompt中强制delegate_task独立审查，不可自己审查自己。
+17. **amadeus_research.py字段不兼容**：session文件用`session_id`非`id`，depth存为字符串。已修复
+18. **修改cron未确认**：SOUL.md 15.2要求cron修改必须确认。必须先输出变更清单等主人确认
+19. **单轮多任务**：SOUL.md 15.4要求每轮只做一个主任务。用todo管理多步骤
+20. **工具调用重复**：同一文件读3-4次浪费token。首次读取后缓存结果
+21. **压缩摘要不可信**：上下文压缩可能记录"已完成"但实际未做。压缩后必须验证关键文件
+22. **delegate_task batch上限3**：5个subagent必须分2批（3+2），不能一次传5个tasks
+23. **amadeus_sector_flow.py已存在**（2026-05-21更正）：`~/.hermes/scripts/amadeus/amadeus_sector_flow.py`存在且可用。板块资金流有两个入口
+24. **审查发现critical必须修正**：不能忽略审查结果，critical问题必须修正后重审通过才能发送
+25. **AKShare fund_etf_hist_em连接不稳**：循环获取19只ETF历史数据时全部RemoteDisconnected。备用：东方财富pushapi+fundgz+pingzhongdata
+26. **execute_code内report生成脚本**：写到scratchpad用terminal执行比inline execute_code可靠。大量数据直接write_file到cache目录
+27. **f-string不能含反斜杠**：Python 3.11 f-string内不允许`\\`，用%格式化或先赋值变量替代
+28. **execute_code 50 tool call limit**：batch操作必须分批执行，每批≤50次terminal调用。先计数再分批
+29. **"执行退池"= run auto**：用户说"执行退池"时直接跑`auto`（退池+入池一步到位），不要拆成scan+apply
+30. **精简池子策略**：B池>15只时按主题分类保留龙头，execute_code批量remove+直接改context做C→B升级
+31. **语言强制**（2026-05-22教训）：cron prompt开头加"全程必须用中文"，输出规范末尾再加一次。不能只在SKILL.md里写
+84. **amadeus_news_scanner.py CLI flags**（2026-06-05验证）：`--json`参数不存在（报"Unknown command"），`hotspots`命令在cron上下文中经常超时（60s）。正确用法：直接运行`python3 amadeus_news_scanner.py hotspots`获取文本输出，或从缓存`news_latest.json`读取（注意缓存可能过期，scan_time字段检查日期）。不支持结构化JSON输出。
+85. **amadeus_emotion.py输出结构变更**（2026-06-05验证）：`emotion_YYYY-MM-DD.json`不再包含`dimensions`字典（旧文档中的`dimensions.limit_ratio.score`等路径不存在）。当前结构为扁平化：`score`/`level`/`components`(维度名称列表)/`missing`/`weights_used`/`data_completeness`/`data_freshness`。各维度分数详情只在脚本控制台输出中，不在JSON中。详见`references/json-cache-structures.md`。
+86. **amadeus_emotion.py --json参数陷阱**（2026-06-04-05反复出现）：`--json`参数在某些上下文中被脚本当作日期字符串处理，导致输出含"使用2026-05-18的数据"警告且数据过期。最佳做法：不传参数直接运行，或用`python3 -c "import amadeus_emotion; ..."`直接调用。
+87. **晚间复盘数据采集降级**（2026-06-05总结）：晚间复盘（21:00）时amadeus_news_scanner.py和amadeus_external.py均可能超时/失败。降级策略：①新闻从缓存读取（检查scan_time是否今天） ②外围市场3/5项缺失标注在数据等级中 ③板块数据AKShare RemoteDisconnected时标注缺失。报告开头用data_quality.py --report-fragment自动评估。
+88. **市场数据JSON中indices字段独立于market**（2026-06-05验证）：指数数据在`d['indices']`下（key如`sh000001`），不在`d['market']`下。market只含总貌（up/down/flat/total_amount/limit_up等）。指数涨跌幅需手动计算：`(close - t_minus_2_close) / t_minus_2_close * 100`。
 
-43. **低分报告无自动改进闭环**（2026-05-21发现）：收盘复盘评分54/100低于60分门槛，但cron生成报告后就结束了，没有自动提取扣分项→生成TODO→下期验证的闭环。修复方向：收盘复盘prompt加"低分改进"步骤，评分<60时自动提取扣分项写入改进清单，下期报告必须验证上期改进执行情况
-44. **做任务必须汇报结果**（行为规则）：做完不说话=违规。即使任务过长/被中断/部分完成，也要说明执行到什么程度、哪些做了哪些没做
-45. **类推检查**（行为规则）：发现某模块有某种机制（降级/验证/重试/异常检测）时，必须主动检查同类模块是否也有。不被动等主人指出
-46. **修改后必须立即测试**（2026-05-24用户纠正）：任何脚本/配置/cron修改完成后，必须当场运行测试确认生效。禁止说"下次会生效"、"下次审计会测"、"下次cron运行时生效"。这是基本工程纪律。正确做法：改完→立即运行→确认通过→汇报结果。
-47. **审计脚本必须审计实际端点**（2026-05-24发现）：审计/监控脚本必须从配置文件读取实际使用的端点，不能硬编码"常见"端点。我们的provider是小米MiMo中转+DeepSeek直连，不是api.anthropic.com。
-48. **/new不清理数据库旧消息**（2026-05-24发现）：session ID是固定的，/new只重置对话上下文，旧消息仍留在数据库中。监控脚本必须按时间窗口统计（如最近24小时），不能统计全量消息，否则/new后仍会误报ALERT。
-49. **numpy类型JSON序列化**（2026-05-24反复出现）：`np.int32`/`np.float32`/`np.bool_`不能直接`json.dumps`。所有涉及ML结果保存的脚本必须用自定义`NumpyEncoder`：
-    ```python
-    class NumpyEncoder(json.JSONEncoder):
-        def default(self, obj):
-            if isinstance(obj, (np.integer, np.int32, np.int64)): return int(obj)
-            elif isinstance(obj, (np.floating, np.float32, np.float64)): return float(obj)
-            elif isinstance(obj, np.ndarray): return obj.tolist()
-            elif isinstance(obj, (bool, np.bool_)): return bool(obj)
-            return super().default(obj)
-    ```
-50. **yfinance限流**（2026-05-24发现）：连续请求50+只股票时yfinance会触发rate limit（HTTP 429）。应对：每5只sleep 0.5秒，或用Tushare/AKShare作为备用数据源。AKShare也会RemoteDisconnected，三源互备最稳。
-51. **集成模型比单模型提升27%+**（2026-05-24验证）：LightGBM和XGBoost简单平均集成，AUC从0.58→0.78。两个模型的预测有互补性，集成是最简单的提升手段。ML预测脚本`ml_predict.py`默认使用集成模型。
-52. **v3.5 AUC数据泄露（2026-05-25发现）**：v3.5报告的集成AUC 0.7785是在全量训练数据上计算的，不是在验证集上。这是**数据泄露**，导致AUC虚高。正确做法：使用TimeSeriesSplit交叉验证，在每个fold的验证集上计算AUC，然后取平均。v4.4的0.6365是正确的交叉验证结果。
-53. **ML训练数据源优先级（2026-05-25验证）**：yfinance（最优，数据质量好）> Tushare Pro（稳定，需API key）> AKShare（严重限流，不可靠）。批量下载时yfinance需0.5s/只，Tushare需0.35s/只。
-54. **ML训练配置最佳实践（2026-05-25验证）**：n_estimators=500, learning_rate=0.03, max_depth=6, reg_alpha=0.1, reg_lambda=0.1, subsample=0.8, colsample_bytree=0.8。必须使用StandardScaler标准化。必须使用TimeSeriesSplit交叉验证。
-52. **报告模板量化信号层**（2026-05-24升级）：早报/午盘/收盘模板v2新增量化信号层（ML评分+因子IC+技术指标量化+加权汇总）。权重：ML30%+因子25%+技术20%+情绪15%+资金10%。模板文件：`templates/morning_template.md`/`midday_template.md`/`review_template.md`。
-53. **特征质量>数据量**（2026-05-25验证）：v4.0用54万样本+14特征AUC仅0.59，v3.5用7.6万样本+44特征AUC达0.78。扩大数据量不能弥补特征不足。44个特征（含均线位置、RSI变化、ATR等）比14个纯技术指标有效得多。
-54. **AKShare不可作主数据源**（2026-05-25反复验证）：stock_zh_a_spot_em/stock_zh_a_hist频繁RemoteDisconnected。ML训练必须用Tushare Pro作主数据源，AKShare仅作备用。
-55. **Tushare限流需sleep 0.35s**（2026-05-25发现）：连续请求会被限流（index_weight 1次/分钟，daily需间隔0.35s）。批量下载必须加延迟，股票列表必须本地缓存。
-56. **10年旧数据可能有害**（2026-05-25验证）：2016年市场规律与2026年差异大，模型学到过时模式。3-5年数据足够覆盖牛熊周期。
-57. **选股必须OCIFQ+ML双轨**（2026-05-25主人纠正）：主人明确要求不能只靠ML模型选股，必须同时使用OCIFQ基本面分析。六维评分=OCIFQ(70%)+ML(30%)已固化到stock-picking skill。
-58. **Tushare daily_basic限流1次/小时**（2026-05-25发现）：120积分账号的daily_basic/fina_indicator接口限流严重。ML训练基本面数据必须用yfinance info（无限流），不能依赖Tushare。
-59. **SHAP特征筛选过度**（2026-05-25验证）：SHAP从69特征筛到50个，去掉了16个有用特征，AUC从0.6512降到0.6385。筛选top_n不宜过紧，建议保留≥80%特征或不筛选。
-60. **OOM分批训练**（2026-05-25验证）：733只股票全量训练需3.4GB内存，服务器3.6GB被OOM杀死。解决：分批200只+每批gc.collect()+加权合并AUC。
-61. **Pandas concat重复列**（2026-05-25修复）：extract_fundamental_features和create_market_cap_features都创建market_cap_raw等列，concat报InvalidIndexError。解决：去掉重复的create_market_cap_features调用。
-62. **yfinance数据类型混用**（2026-05-25修复）：yfinance info返回的数值可能是字符串，与int比较报错。解决：pd.to_numeric(col, errors='coerce')强制转换。
-63. **Cron script路径必须包含子目录**（2026-05-25修复）：amadeus_watcher.py在scripts/amadeus/下，cron配置的script应为`amadeus/amadeus_watcher.py`而非`amadeus_watcher.py`。
-64. **禁止只用ML分析股票**（2026-05-25用户纠正）：用户要求分析股票时，必须使用完整的OCIFQ+ML六维评分体系，不能只用ML模型。ML只是参考维度之一（占30%），基本面分析（OCIFQ）才是核心（占70%）。正确流程：先获取财务数据计算OCIFQ，再获取ML评分，最后整合生成六维评分。使用`ocifq_ml_selector.py`整合脚本。
-65. **风险整改必须自动执行**（2026-05-26用户纠正）：收盘复盘报告中发现的风险问题（止损未执行、池子膨胀、违规操作等）必须自动整改，不能只报告不执行。整改流程：①读取报告中的风险项目 ②验证实际数据（止损线、浮亏、池子数量） ③执行整改（清理池子、执行止损、更新状态） ④生成整改报告。用户原话："风险评估内容中的项目都自动整改"。
-66. **B池膨胀必须主动精简**（2026-05-26教训）：B池>50只时必须主动精简，保留前50只（按浮盈排序），移出其余至退池。不能等用户指示。清理后必须同步更新session_context.json和pool_state.json。
-67. **止损判断必须验证实际数据**（2026-05-26教训）：报告中的止损判断可能错误（如"中信证券止损连续4天未执行"实际浮亏-3.46%未触发-5%止损线）。止损判断必须：①读取pool_state.json或session_context.json中的实际浮亏 ②与止损线比较（A池-10%/B池-5%/C池-3%） ③只有实际触发才报告"止损触发"。不能依赖报告中的错误判断。
-68. **Cron限流规则强化**（2026-05-26教训）：微信推送间隔≥10分钟（2026-05-27实测5分钟不够）。收盘后任务密集排布：ML信号15:20→收盘复盘15:30→ML模拟盘15:40→观察池15:50。盘中异动监控改为每小时（10:00/12:00/14:00），不再每30分钟。**Discord已配置为主推送渠道**（2026-05-27迁移），微信仅交互不推送。
-69. **docx发送必须写明具体步骤**（2026-05-27教训）：cron prompt只写"完整版走docx"不够，agent不知道怎么执行。必须写明第四步：①保存markdown文件 ②运行to_docx.py ③回复中包含MEDIA:标签。否则agent只说"已生成docx"但不实际发送。
-70. **收盘复盘v3模板**（2026-05-27升级）：参考行业最佳实践报告，新增30秒速读/预测命中率(x/y=z%)/规则系统R-xx/股票池五级分类/明日继承项/盘中策略验证/主线独立跟踪/数据源逐项标注。详见`templates/review_template.md`、`references/rule-system.md`、`references/inheritance-system.md`。
-69. **docx发送必须写明完整操作步骤**（2026-05-27教训）：cron prompt中只写"完整版转.docx通过MEDIA:发送"是不够的——cron agent看到这句话但不知道怎么执行。必须在prompt中增加明确的**第四步**：①将完整报告保存为markdown文件 ②运行`cat <报告文件> | python3 ~/.hermes/scripts/amadeus/to_docx.py "标题" ~/.hermes/cache/amadeus/<报告名>_$(date +%Y%m%d).docx` ③在最终回复中包含`MEDIA:/home/ubuntu/.hermes/cache/amadeus/<报告名>_$(date +%Y%m%d).docx`。所有报告类cron（早报/午盘/收盘/周报）的prompt都必须包含这个显式步骤。
+**Humanizer必须在cron prompt中显式执行**（2026-05-22教训）：cron prompt中加显式步骤`python3 humanize_auto.py <文件> --inplace`
+**to_docx可靠调用**：`references/to_docx-reliable-usage.md`（2026-06-04：管道模式在execute_code中静默失败，改用直接import调用）
+33. **数据缺口必须在报告正文中标注**（2026-06-03教训）：新闻超时/北向缺失/pool_state为空时，不能沉默跳过章节，必须在对应段落中标注缺口。详见`references/data-gap-handling.md`。
+33. **ETF池管理与个股池独立**：etf_notes和stock_notes是context中独立字段，ETF池有差异化止损、折溢价检查、流动性门槛
+34. **amadeus_emotion.py过期检测已完善**（2026-05-21更新）：v3.0补齐load_market_extra()过期检测，三数据源过期状态均注入stale_warnings字段
+35. **无交叉数据验证**：脚本层各数据源独立采集，没有自动对比机制。review subagent不做数值交叉验证。
+36. **板块资金流单位待验**：同花顺返回值可能是万元非亿元，至今未交叉核验。
+37. **AKShare fund_etf_spot_em()慢但数据全**：~27秒获取1467只ETF全量数据。日常scan用Sina API（秒级），详细风险检查才调AKShare
+38. **ETF入池来源**：个股池入池靠stocks_mentioned字段，ETF入池靠sectors字段映射到板块→ETF代码表
+39. **humanizer篡改事实数据**（2026-05-27发现）：`humanize_auto.py --inplace`会篡改数字、股票代码、数据等级。修复：humanize后必须校验关键数据，发现篡改立即回滚。详见`references/humanizer-factual-errors.md`。
+40. **安全扫描阻止pipe到python3**：cron job中`cat file | python3 script.py`会被`tirith:pipe_to_interpreter`拦截。**最佳替代**：用shell重定向 `python3 script.py args < input.md`（实测2026-05-29通过）。`exec(open())`模式因`__file__`未定义不可用。
+41. **腾讯API返回GBK编码**：qt.gtimg.cn返回中文是GBK编码，必须用`result.stdout.decode('gbk', errors='replace')`
+42. **Gateway重启诊断**（2026-05-28教训）：`restart_gateway.sh`被系统cron每天触发6次导致频繁打断。修复：脚本内时间门控`if [ "$HOUR" != "03" ]; then exit 0; fi`。详见`references/gateway-cron-troubleshooting.md`。
+43. **Tushare在venv中**：Tushare安装在hermes-agent venv，不在系统Python。120积分可用接口有限。
+44. **data_validator.py异常值检测**：所有数据采集脚本共用。新脚本必须import并使用，不可跳过验证
+45. **amadeus_emotion.py数据格式不匹配**：读`limit_up_stocks`中`连板数`字段不存在（实际在`lianban[].board_count`），读`index_data.volume`不存在。已修复：新增load_market_extra()
+46. **AKShare stock_zh_a_spot()瞬时故障**：偶尔只返回80只股票（应5000+）。建议：采集后校验`len(df) > 1000`，否则重试或降级
+47. **integrate-news不自动入池**（2026-05-21修复）：原只生成候选不调add_stock()，导致6天只退不进。已修复：自动调用add_stock+过滤条件
+48. **Cron任务撞限流**（2026-05-22大规模复盘）：14个job中7个被限流。修复：间隔≥10分钟，Discord为主推送渠道。详见`references/cron-schedule-optimized.md`。
+49. **数据质量等级制度**（2026-05-21新增）：data_quality.py统一评估8项核心数据，等级低于C+必须加降级警告，D/F级不得进入正式胜率统计
+50. **报告必须标注数据来源**（2026-05-21新增）：每个数据点标明来源类型，禁止web_search/LLM推理数据伪装成结构化接口数据
+51. **pool_manager.py数据源降级梯队**（2026-05-21新增）：4级降级：新浪→腾讯API→AKShare→Ashare。每级只处理上一级缺失股票
+52. **复盘自动改进闭环**（2026-05-21新增）：收盘复盘每次提取改进动作→保存到improvement_pending.json→下期验证。连续两天未完成标为🔴严重违规
+53. **备份job改local保存**（2026-05-21新增）：3个容错备份job的deliver从origin改为local，渠道级限流备份照样被挡，主job失败时手动补发
+54. **pool_manager.py remove_stock OCIFQ误拦**（2026-05-28修复）：`remove_stock`被`ocifq_enforce.py`注入OCIFQ检查导致退池被拒。铁律：OCIFQ检查只应用于add_stock，不应用于remove_stock。
+55. **情绪温度市场宽度因子阈值跳跃**（2026-05-28修复）：改用连续函数`width_score = min(25, zt/120*25)`，有真实上涨家数时优先用breadth_pct
+56. **Humanizer双重存在**（2026-05-28梳理）：humanize_auto.py（规则引擎）和humanizer-zh SKILL.md（参考规则库）是两套东西。to_docx.py内建调用humanize_auto.py
+57. **amadeus_emotion.py市场宽度用proxy值**（2026-06-03发现）：`市场宽度`维度用`pools.limit_up_count`（从lianban[]统计的66只）而非`market.limit_up`（新浪返回的107只）。差异原因：pools只统计当日连板/首板中涨停的，market包含所有收盘涨停股。效果：宽度分数偏低（13.8/25 vs 可能的20+/25）。如果需要更准确的情绪温度，应改用`market.limit_up`作为宽度因子输入。
+57. **低分报告无自动改进闭环**（2026-05-21发现）：评分<60时自动提取扣分项写入改进清单，下期必须验证
+58. **做任务必须汇报结果**（行为规则）：做完不说话=违规。即使被中断也要说明执行程度
+59. **类推检查**（行为规则）：发现某模块有某种机制时，必须主动检查同类模块是否也有
+60. **修改后必须立即测试**（2026-05-24用户纠正）：任何脚本/配置/cron修改完成后，必须当场运行测试确认生效
+61. **审计脚本必须审计实际端点**（2026-05-24发现）：从配置文件读取实际端点，不能硬编码。provider是小米MiMo中转+DeepSeek直连
+62. **/new不清理数据库旧消息**（2026-05-24发现）：session ID固定，/new只重置上下文。监控脚本必须按时间窗口统计
+63. **numpy类型JSON序列化**（2026-05-24反复出现）：所有ML结果保存必须用自定义NumpyEncoder转换np.int32/float32/bool_
+64. **yfinance限流**（2026-05-24发现）：连续50+只触发HTTP 429。应对：每5只sleep 0.5秒，三源互备
+65. **集成模型比单模型提升27%+**（2026-05-24验证）：LightGBM+XGBoost简单平均集成，AUC大幅提升
+66. **v3.5 AUC数据泄露**（2026-05-25发现）：0.7785是在全量训练数据计算的，正确交叉验证结果是v4.4的0.6365
+67. **ML训练数据源优先级**（2026-05-25验证）：yfinance（最优）> Tushare Pro > AKShare（严重限流）
+68. **ML训练配置最佳实践**（2026-05-25验证）：n_estimators=500, lr=0.03, max_depth=6, StandardScaler+TimeSeriesSplit
+69. **报告模板量化信号层**（2026-05-24升级）：权重ML30%+因子25%+技术20%+情绪15%+资金10%
+70. **特征质量>数据量**（2026-05-25验证）：v4.0用54万样本+14特征AUC仅0.59，v3.5用7.6万样本+44特征效果好得多
+71. **AKShare不可作主数据源**（2026-05-25反复验证）：频繁RemoteDisconnected。ML训练必须用Tushare Pro作主数据源
+72. **Tushare限流需sleep 0.35s**（2026-05-25发现）：批量下载必须加延迟，股票列表必须本地缓存
+73. **10年旧数据可能有害**（2026-05-25验证）：2016年与2026年市场规律差异大，3-5年数据足够
+74. **选股必须OCIFQ+ML双轨**（2026-05-25主人纠正）：六维评分=OCIFQ(70%)+ML(30%)
+75. **Tushare daily_basic限流1次/小时**（2026-05-25发现）：ML训练基本面数据必须用yfinance info（无限流）
+76. **SHAP特征筛选过度**（2026-05-25验证）：从69筛到50个去掉了16个有用特征，AUC反降。建议保留≥80%特征
+77. **OOM分批训练**（2026-05-25验证）：733只股票全量训练需3.4GB，服务3.6GB被OOM杀掉。解决：分批200只+gc.collect()
+78. **Pandas concat重复列**（2026-05-25修复）：extract_fundamental_features和create_market_cap_features都创建相同列，concat报错。已去掉重复调用
+79. **yfinance数据类型混用**（2026-05-25修复）：yfinance info返回值可能是字符串，用pd.to_numeric(col, errors='coerce')强制转换
+80. **Cron script路径必须包含子目录**（2026-05-25修复）：amadeus_watcher.py在scripts/amadeus/下，cron的script应为`amadeus/amadeus_watcher.py`
+81. **禁止只用ML分析股票**（2026-05-25用户纠正）：必须使用完整的OCIFQ+ML六维评分体系，ML只占30%。使用`ocifq_ml_selector.py`整合脚本
+82. **Cron限流规则强化**（2026-05-26教训）：收盘后任务密集排布，盘中异动改为每小时。Discord已配置为主推送渠道
+83. **收盘复盘v3模板**（2026-05-27升级）：新增30秒速读/预测命中率/规则系统R-xx/五级分类/继承项/数据源标注。详见`templates/review_template.md`
+84. **amadeus_news_scanner.py频繁超时**（2026-05-29验证）：`scan --json`（120s超时）和`hotspots`（60s超时）在cron上下文中经常失败。降级策略：直接从东方财富/财联社网页抓取热点，或跳过新闻板块在报告中标注"新闻采集超时"。不要无限等待新闻脚本。
+85. **amadeus_realtime.py不支持逗号分隔批量查询**（2026-05-29发现）：`amadeus_realtime.py 601138,300502,002475`返回"数据不足30日"错误。应逐只查询或用空格分隔。
+86. **决策日志验证规则**（2026-05-30新增）：收盘复盘必须验证decision_log.json中pending预判。大盘方向±0.2%阈值，板块前1/3命中，个股方向一致命中。滚动20次命中率<50%触发改进闭环。详见self-improvement skill Section十七。
+87. **Cron prompt从jobs.json提取需特殊处理**（2026-05-30发现）：`~/.hermes/cron/jobs.json`中prompt字段含unicode转义（`\uXXXX`），直接`json.loads`会因嵌套引号失败。正确方法：写Python脚到文件→逐字符扫描找字符串边界→`json.loads('"' + raw + '"')`解码。详见`references/cron-prompt-extraction.md`。
+88. **read_file带行号前缀**（2026-06-02发现）：`read_file`返回格式`LINE_NUM|CONTENT`，在execute_code中解析JSON需先用`line.split("|", 1)[1]`去掉行号。**更简单的方法**：用`terminal("cat file")`读取JSON文件，返回纯内容可直接`json.loads`。
+89. **amadeus_realtime.py多只股票输出被覆盖**（2026-06-02发现）：`amadeus_realtime.py 600487 000960`只返回最后一只的完整数据，前面的被覆盖。正确用法：逐只调用或检查`realtime_*.json`的stocks字典中是否包含所有请求的股票。
+90. **execute_code中terminal返回值格式**（2026-06-02发现）：`terminal("cat file")`返回`{"output": "...", "exit_code": 0}`，output是纯字符串可直接`json.loads`。但需注意如果命令失败（exit_code!=0），output可能含错误信息不是JSON。
+91. **东财API限流铁律**（2026-06-03验证）：所有eastmoney.com请求必须走`em_get()`统一入口（1s间隔+随机抖动+会话复用）。push2.eastmoney.com不稳定（偶尔502），datacenter-web.eastmoney.com稳定。数据源优先级：腾讯/同花顺（不封IP）> 东财datacenter（有风控）> 东财push2（不稳定）。
+92. **外部数据工具集成方法论**（2026-06-03总结）
+93. **to_docx.py管道在execute_code中静默失败**（2026-06-04发现）：`cat file | python3 to_docx.py`在execute_code环境中可能不生成文件、无输出、无报错。**可靠替代**：直接Python import调用`md_to_docx(content, title, path)`。调用后必须`ls -la`验证文件生成。
+94. **amadeus_emotion.py --json被误解析为日期**（2026-06-04发现）：`--json`参数在某些上下文中被脚本当作日期字符串处理，导致输出含"使用2026-05-18的数据"警告且数据过期。解决：检查emotion脚本的参数解析逻辑，或改用`python3 -c "import amadeus_emotion; ..."`直接调用。：①下载SKILL.md理解覆盖范围 ②逐端点实测（写脚本+记录状态/延迟/质量） ③对比现有系统识别重叠/互补/独占 ④只集成独占+互补端点 ⑤创建补充skill（独立SKILL.md+CLI脚本） ⑥更新工作流（新Agent/升级现有/并行架构） ⑦更新报告模板。详见`pantalone/references/a-stock-data-integration.md`。
 
 ## ML模拟盘验证系统（2026-05-25新增）
 
@@ -623,14 +641,27 @@ python3 ~/.hermes/scripts/amadeus/ml_backtest.py --stocks 600519,000858,300750 -
    - 审查发现critical→必须修正后重新审查
    - 实测：第1轮发现仓位数据矛盾（38%vs6.26%）→修正→第2轮74分通过
 
-### 5个并行subagent
+### 8个subagent（3批并行）
+
+**第1批并行（3个）：**
 | subagent | 职责 | toolsets | 脚本 |
 |----------|------|----------|------|
-| market_data | 情绪温度+板块资金流+大盘信号 | terminal | amadeus_emotion.py, amadeus_sector_flow.py, amadeus_market_filter.py |
-| technical | MA/RSI/MACD/布林带/支撑压力 | terminal | amadeus_realtime.py, amadeus_indicators.py |
+| market_data | 情绪温度+板块资金流+大盘信号+**北向分钟流** | terminal | amadeus_emotion.py, amadeus_sector_flow.py, amadeus_market_filter.py, **a_stock_data_supp.py north** |
+| **capital** | **龙虎榜席位+融资融券+大宗交易+北向资金** | terminal | **a_stock_data_supp.py lhb/rzrq/dzjy/north** |
 | macro | 外围市场+宏观环境 | terminal, web | amadeus_external.py |
-| theme | 新闻+题材+板块轮动 | terminal, web | amadeus_news_scanner.py |
-| risk | 选股+排雷扫描 | terminal | amadeus_screening.py |
+
+**第2批并行（3个）：**
+| subagent | 职责 | toolsets | 脚本 |
+|----------|------|----------|------|
+| theme | **同花顺热点归因**+行业排名+新闻+题材 | terminal, web | **a_stock_data_supp.py hot/hyph**, amadeus_news_scanner.py |
+| financial | 财报分析+**分红送转** | terminal, web | amadeus_financials.py, **a_stock_data_supp.py fhzz** |
+| technical | MA/RSI/MACD/布林带/支撑压力 | terminal | amadeus_realtime.py, amadeus_indicators.py |
+
+**第3批（依赖前两批）：**
+| subagent | 职责 | toolsets | 脚本 |
+|----------|------|----------|------|
+| risk | 排雷扫描+**筹码分析(股东户数/解禁/大宗)** | terminal | amadeus_screening.py, **a_stock_data_supp.py gdrs/jxjj/dzjy** |
+| research | **研报评级+公告**（按需启用） | terminal, web | **a_stock_data_supp.py report/gonggao** |
 
 ### ETF分析流程（v3.4新增，2026-05-17）
 | subagent | 职责 | toolsets | 文件 |
@@ -650,6 +681,13 @@ python3 ~/.hermes/scripts/amadeus/ml_backtest.py --stocks 600519,000858,300750 -
 - 均分<70 → ETF质地一般，谨慎配置
 - 行业集中度>40%的ETF需验证行业利润断层（I维度）
 - 前十大持仓中有≥3家满足财务三爆（F维度）→ ETF评级+1
+
+**⚠️ ETF重叠检测（2026-06-02新增）**：
+持仓中有多个ETF时必须检查重叠度。常见重叠组合：
+- 科创50ETF ∩ 科创芯片ETF：科创板芯片是科创50核心权重，持有两个=同一方向押两次
+- 半导体设备ETF ∩ 科创50ETF：北方华创、中微公司同时出现在两个ETF中
+- 创业板ETF ∩ 新能源ETF：宁德时代、阳光电源重叠
+检测方法：对比前十大持仓，重叠>3只需警告用户合并。
 
 ### 审查规则
 - 必须用delegate_task，不可自我审查
@@ -761,6 +799,8 @@ python3 ~/.hermes/scripts/vector_search.py search "清除聊天记录"
 
 **自动处理**：`to_docx.py` 已内建humanizer，docx转换时自动去AI痕迹。
 **手动处理**：摘要文本发送前运行 `python3 ~/.hermes/scripts/amadeus/humanize_auto.py <报告文件> --inplace`
+**SKILL.md参考**：`~/.hermes/skills/writing/humanizer-zh/SKILL.md`（8424⭐，深度润色参考规则库）
+**⚠️ 双重存在**：humanize_auto.py（规则引擎，5/22安装）和humanizer-zh SKILL.md（参考规则库，5/28安装）是两套东西。to_docx.py内建调用humanize_auto.py。SKILL.md作为深度润色参考。
 
 ### 使用方法
 ```bash

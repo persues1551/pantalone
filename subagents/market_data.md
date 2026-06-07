@@ -10,6 +10,7 @@ delegate_task(
 1. 运行 python3 ~/.hermes/scripts/amadeus/amadeus_emotion.py 采集情绪温度
 2. 运行 python3 ~/.hermes/scripts/amadeus/amadeus_sector_flow.py 采集板块资金流
 3. 运行 python3 ~/.hermes/scripts/amadeus/amadeus_market_filter.py 采集大盘信号
+4. 运行 python3 ~/.hermes/skills/investment/a-stock-data-supp/scripts/a_stock_data_supp.py north 获取北向资金实时分钟流向
 
 返回结构化数据摘要。""",
     context="数据采集任务",
@@ -19,9 +20,10 @@ delegate_task(
 
 ## 数据源优先级
 
-1. amadeus_emotion.py（公式固化，读缓存+过期检测）
-2. amadeus_sector_flow.py（同花顺，带单位核验）
-3. amadeus_market_filter.py（腾讯API+AKShare）
+1. **amadeus_emotion.py** — 情绪温度（公式固化，读缓存+过期检测）
+2. **amadeus_sector_flow.py** — 板块资金流（同花顺，带单位核验）
+3. **amadeus_market_filter.py** — 大盘信号（腾讯API+AKShare）
+4. **a_stock_data_supp.py north** — 北向资金实时分钟流（同花顺hsgtApi）（新增）
 
 ## 输出格式（必须遵守）
 
@@ -29,35 +31,24 @@ delegate_task(
 
 ```json
 {
-  "emotion": {
-    "score": 76,
-    "level": "高潮",
-    "data_freshness": "fresh|stale",
-    "stale_warnings": [],
-    "components": {}
+  "emotion": {"score": 65, "level": "中性偏强", "components": {}},
+  "sector_flow": {"top_inflow": [], "top_outflow": []},
+  "market_filter": {"level": "震荡偏强", "position_pct": 50},
+  "northbound": {
+    "hgt_yi": -9.28,
+    "sgt_yi": -31.1,
+    "total_yi": -40.38,
+    "bias": "净流出",
+    "intraday_signal": "尾盘加速流出"
   },
-  "sector_flow": {
-    "top_inflow": [{"name": "xxx", "net_inflow_yi": 1.23, "change_pct": 0.5}],
-    "top_outflow": [],
-    "key_flow": [],
-    "unit_standardized": "亿元",
-    "unit_confidence": "high|medium|low"
-  },
-  "market_filter": {
-    "level": "震荡偏强",
-    "limit_up": 54,
-    "limit_down": 15,
-    "index_change_pct": 0.5
-  },
-  "errors": [],
-  "data_sources": ["amadeus_emotion.py", "amadeus_sector_flow.py", "amadeus_market_filter.py"]
+  "data_quality": "A"
 }
 ```
 
-## 关键规则
+## 北向资金分钟流判断
 
-1. **不可编造数据**：所有数字必须来自脚本输出
-2. **必须标注数据来源**：每个数据点标注来自哪个脚本
-3. **过期数据必须标注**：如果 emotion 返回 `data_freshness: "stale"`，必须在报告中注明
-4. **单位必须标准化**：板块资金流统一用"亿元"
-5. **脚本失败不可跳过**：如果某个脚本失败，放入 `errors` 数组，不可用 LLM 推断替代
+- **盘中净流入 > 20亿** = 强烈看多
+- **盘中净流入 0-20亿** = 中性偏多
+- **盘中净流出 0-20亿** = 中性偏空
+- **盘中净流出 > 20亿** = 强烈看空
+- **尾盘30分钟方向** = 最可靠信号（机构调仓）
