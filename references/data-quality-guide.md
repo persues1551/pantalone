@@ -78,3 +78,11 @@ data_quality.py 的 `CORE_ITEMS` 中，`cache_pattern` 字段如果数据在 mar
 - `data_quality.py`：数据质量等级评估（8项核心数据），输出报告所需的来源标注
 
 两者独立运行，cron报告中两个都要调用。
+
+## pitfall：指数数据可能过期（2026-06-08发现）
+
+`data_quality.py`检查`indices`字段时只验证"dict且≥2个指数"，不验证指数值是否为当天数据。如果amadeus_data.py采集时指数源返回前一日收盘价，data_quality仍会报告"✅ 结构化接口(今日)"。
+
+**检测方法**：比较`market_today.json`的`indices.sh000001.close`与`market_yesterday.json`的同一字段，如果完全相同则指数数据可能过期。
+
+**修复**：用腾讯API `qt.gtimg.cn` 直接获取真实收盘价（详见`references/json-cache-structures.md`的"Verifying Stale Indices"章节）。

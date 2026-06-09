@@ -18,6 +18,11 @@ version: 3.5.0
 **规则系统**：`references/rule-system.md`（R-xx编号/触发条件/有效期/状态/继承性，收盘复盘必须检查和更新）
 **继承项系统**：`references/inheritance-system.md`（每日收盘生成明日继承项，次日早盘必须读取）
 **收盘复盘模板v3**：`templates/review_template.md`（30秒速读/预测命中率/规则系统/五级股票池/继承项/数据源逐项标注）
+**观察池哲学v2.0**：`references/pool-philosophy-v2.md`（逻辑驱动入池+双维度评估+自动扫描+验证机制）
+**双维度评估框架**：`references/dual-dimension-evaluation.md`（长线60%+短线40%评分+四象限策略矩阵）
+**自动扫描机制**：`references/auto-scan-mechanism.md`（ML扫描+行业扫描+新闻扫描+定时任务）
+**统一池管理脚本**：`scripts/amadeus/pool_manager.py`（v3.0：入池/退池/评分/验证/同步，唯一数据源session_context.json）
+**自动扫描脚本**：`scripts/amadeus/pool_auto_scanner.py`（ML/行业/新闻三类扫描，自动入池）
 **止损自动监控**：`scripts/amadeus/stop_loss_monitor.py`（A池-10%/B池-5%/C池-3%，每天15:00自动检查）
 **止损确认与告警**：`references/stop-loss-and-pool-rules.md`（止损确认机制+滞后告警+入池OCIFQ强制）
 **决策日志系统**：`~/.hermes/cache/amadeus/decision_log.json`（预判→验证→命中率→改进闭环。晚间复盘写入预判，收盘复盘验证前日预判+写入新预判。详见self-improvement skill的Section十七+`references/investment-iteration-guide.md`）。**JSON结构**：顶层keys=`version/created/entries/stats`，`entries`是数组（非predictions），每条entry=`{id, date, type, prediction, confidence, status, source, target?, verified_date?, result?}`，`stats`=`{total_predictions, verified, hits, misses}`。读取时用`terminal("cat file")`而非`read_file`（后者带行号前缀LINE_NUM|CONTENT，JSON解析需额外处理）。**详细结构**：`references/decision-log-structure.md`
@@ -49,9 +54,18 @@ version: 3.5.0
 **数据质量系统详细文档**：`references/data-quality-system.md`（8项核心数据/cache加载逻辑/等级规则/pitfall/与其他模块关系）
 **Pool Manager数据源降级**：`references/pool-manager-fallback.md`（4级降级梯队/调用点/pitfall/类推教训）
 **Tushare接口清单**：`references/tushare-interfaces.md`（120积分可用/不可用接口+替代方案）
-**OCIFQ选股框架**：`references/ocifq-framework.md`（行业印钞机五维评分+双轨制+实战案例）
+## integrate-news自动入池修复
 **integrate-news自动入池修复**：`references/integrate-news-auto-add-fix.md`（2026-05-21修复：只生成建议不入池的bug）
+**观察池哲学v2**：`references/pool-philosophy-v2.md`（逻辑验证驱动，入池必须有假设+验证+成功/失败标准）
+**双维度评估框架**：`references/pool-dual-dimension-evaluation.md`（长线60%+短线40%，四象限策略矩阵）
+**观察池Pitfalls**：`references/pool-pitfalls.md`（#88-93：数据源不统一、无逻辑入池、涨停陷阱等）
+**手动入池工作流**：`references/manual-pool-addition-workflow.md`（新闻扫描超时时，用AKShare涨停池手动入池session_context.json）
+**新闻入池降级路径**：当amadeus_news_scanner.py超时(>90s)且news_scan_*.json缓存过期时：①尝试从新浪/财联社/东财API直接抓取热点 ②如仍失败，标注"新闻采集超时，无新入池候选"在报告中 ③周末/节假日新闻少属正常，不必强求入池
 **选股Skill**：`stock-picking` skill（OCIFQ选股完整流程，输出≥10只牛股）
+**观察池哲学v2.0**：`references/pool_philosophy.md`（逻辑实验场，无逻辑不入池）
+**观察池规则v2.0**：`references/pool_rules_v2.md`（逻辑验证驱动，入池模板/验证模板/复盘模板）
+**观察池管理器v2.0**：`scripts/amadeus/pool_manager_v2.py`（逻辑验证驱动的入池/退池/验证检查）
+**验证日志**：`cache/amadeus/pool_verify_log.json`（记录验证结果和教训）
 **10模块投研系统**：`references/ten-module-investment-system.md`（完整架构：10个skill+五层报告+模板清单）
 **盘中异动监控脚本**：`scripts/amadeus_watcher.md`（涨跌幅/止损/涨停监控，每30分钟执行）
 
@@ -369,9 +383,26 @@ pytest ~/.hermes/scripts/amadeus/tests/test_pantalone_data.py -v
 **腾讯API**：无需Key，详见 `references/code-examples.md`
 **板块资金流**：amadeus_data.py → collect_sector_flow()
 **情绪温度**：amadeus_emotion.py（公式固化，禁止LLM手动算）
-**个股观察池**：pool_manager.py auto（自动scan+integrate-news+apply+日志），数据存stock_notes
+**个股观察池**：pool_manager.py（统一管理，长短线分离），数据存stock_notes
+- **长线池（A/B池）**：财报三爆+估值合理+行业景气+竞争格局，验证期30天
+- **短线池（C池）**：涨停+成交额+换手率，验证期1天
+- **筛选框架**：5次迭代优化（财报→估值→行业→竞争→综合评分）
+- **详细规则**：`references/pool_philosophy.md` + `references/pool_financial_keywords.md` + `references/pool_optimization_framework.md`
+- **自动扫描**：pool_auto_scanner.py（ML/行业/新闻/财报四种扫描）
+- **验证迭代**：pool_verify.py（验证+迭代分析）
+**ETF观察池**：etf_pool_manager.py auto（自动scan退池+新闻入池+18项风险检查+日志），数据存etf_notes
+**入池铁律**：必须有逻辑假设（type/hypothesis/success_criteria/failure_criteria/verify_date），详见`references/pool-philosophy-v2.md`
+**个股观察池**：`pool_manager.py` v3.0（统一管理脚本，数据源=session_context.json）。详见 `references/pool-philosophy-v2.md`
+**观察池自动扫描**：`pool_auto_scanner.py` v1.2（ML/行业/新闻/财报四类扫描，1天验证期，财报关键词筛选）
+**观察池哲学**：逻辑实验场，不是热点收藏夹。入池必须有逻辑假设+验证机制。双维度评分（长线60%+短线40%）。详见 `references/pool-philosophy-v2.md`
 **ETF观察池**：etf_pool_manager.py auto（自动scan退池+新闻入池+18项风险检查+日志），数据存etf_notes。脚本：`scripts/amadeus/amadeus_etf_pool_manager.py`。ETF类型差异化止损（宽基-6%/行业-8%/QDII-10%/债券-3%）。详见 `rules/pool_rules.md` ETF章节
-**观察池状态文件**：`cache/amadeus/pool_state.json`（动态状态，不存记忆。每次pool_manager执行后更新。含A/B/C池个股、盈亏、状态、主题、退池记录、活跃主题）
+**观察池状态文件**：`cache/amadeus/pool_state.json`（从session_context.json自动同步，pool_manager.py sync命令）
+**财报关键词筛选**：`references/financial-keyword-filter.md`（知乎职业投资人方法论融入OCIFQ F维度，10个关键词对应OCIFQ五维）
+**双维度评估**：`references/dual-dimension-evaluation.md`（长线60%+短线40%，四象限策略矩阵）
+**验证迭代**：`references/pool-verify-iteration.md`（1天验证期，成功升级/失败退池/偏移延长）
+**自动扫描配置**：`references/auto-scan-config.md`（ML/行业/新闻/财报四源扫描，定时任务清单）
+**观察池哲学v2.0**：`references/pool-philosophy-v2.md`（逻辑实验场，入池必须有假设+验证+标准）
+**观察池管理命令**：`python3 pool_manager.py status|scores|verify|sync|add|update|remove`
 
 ### 动态状态存储规范
 
@@ -429,6 +460,7 @@ pytest ~/.hermes/scripts/amadeus/tests/test_pantalone_data.py -v
 1. **报告过大导致Gateway假死**：50-75KB报告分30+chunk触发iLink限流→event loop崩溃。修复：摘要+docx
 2. **to_docx.py从stdin读取**：`cat file.md | python3 to_docx.py "标题" output.docx`
 3. **模拟盘从未写入**：cron只读不调record。v3.0已修复
+4. **观察池无逻辑入池**（2026-06-08教训）：涨停就入池是错误做法。入池必须有逻辑假设、验证时间、成功/失败标准。详见`references/pool_philosophy.md`
 4. **情绪温度LLM偏差巨大**：28 vs 67差43分。必须用amadeus_emotion.py
 5. **盘前Sina API返回current=0**：pool_manager用prev_close降级
 6. **涨停阈值未区分板块**：主板10%/科创创业20%/北交所30%/ST 5%
@@ -454,14 +486,31 @@ pytest ~/.hermes/scripts/amadeus/tests/test_pantalone_data.py -v
 26. **execute_code内report生成脚本**：写到scratchpad用terminal执行比inline execute_code可靠。大量数据直接write_file到cache目录
 27. **f-string不能含反斜杠**：Python 3.11 f-string内不允许`\\`，用%格式化或先赋值变量替代
 28. **execute_code 50 tool call limit**：batch操作必须分批执行，每批≤50次terminal调用。先计数再分批
-29. **"执行退池"= run auto**：用户说"执行退池"时直接跑`auto`（退池+入池一步到位），不要拆成scan+apply
-30. **精简池子策略**：B池>15只时按主题分类保留龙头，execute_code批量remove+直接改context做C→B升级
+30. **观察池是逻辑实验场，不是热点收藏夹**（2026-06-08用户纠正）：入池必须有逻辑假设（假设/催化剂/成功标准/失败标准/验证时间），不能只因涨停就入池。观察池目的是"验证逻辑"而非"抓住涨停"。详见`rules/pool_philosophy.md`。
+31. **长短线池必须分离**（2026-06-08用户要求）：长线池侧重基本面（财报/估值/行业/格局），验证期30天；短线池侧重技术面（涨停/成交额/换手率），验证期1天。两者评分体系独立，不能混用。
+32. **财报关键词筛选**（2026-06-08知乎职业投资人分享）：关注"产品供不应求、行业高景气度上行、市场超预期拓展、新品上市持续超预期、产品价格中枢持续上涨、供给偏紧、需求旺盛"等关键词，叠加业绩大增=重点关注。详见`rules/pool_financial_keywords.md`。
+33. **5次迭代优化框架**（2026-06-08总结）：筛选标准需迭代优化：①财报三爆→②估值合理→③行业景气→④竞争格局→⑤综合评分。每次迭代记录淘汰原因和数量，形成筛选漏斗。详见`rules/pool_optimization_framework.md`。
+34. **观察池数据源统一**（2026-06-08修复）：session_context.json是唯一数据源，pool_state.json从它同步。pool_manager.py必须统一读写session_context.json，不能有多个数据源。
+35. **"执行退池"= run auto**：用户说"执行退池"时直接跑`auto`（退池+入池一步到位），不要拆成scan+apply
+36. **精简池子策略**：B池>15只时按主题分类保留龙头，execute_code批量remove+直接改context做C→B升级
 31. **语言强制**（2026-05-22教训）：cron prompt开头加"全程必须用中文"，输出规范末尾再加一次。不能只在SKILL.md里写
 84. **amadeus_news_scanner.py CLI flags**（2026-06-05验证）：`--json`参数不存在（报"Unknown command"），`hotspots`命令在cron上下文中经常超时（60s）。正确用法：直接运行`python3 amadeus_news_scanner.py hotspots`获取文本输出，或从缓存`news_latest.json`读取（注意缓存可能过期，scan_time字段检查日期）。不支持结构化JSON输出。
+85. **观察池数据源不统一**（2026-06-08发现）：pool_state.json、session_context.json、pool_manager.py各自维护不同数据。修复：session_context.json为唯一数据源，pool_state.json自动同步，pool_manager.py v3.0统一管理。详见`references/pool-pitfalls.md`。
+86. **无逻辑入池陷阱**（2026-06-08纠正）：涨停股直接入池没有逻辑假设，变成"热点收藏夹"。铁律：入池必须填写完整逻辑假设（type/hypothesis/success_criteria/failure_criteria/verify_date），否则不允许入池。
+87. **观察池目的不清**（2026-06-08用户纠正）：观察池是"逻辑实验场"不是"热点收藏夹"，目的是通过持续验证建立可复制的选股逻辑体系。
+88. **双维度评估缺失**（2026-06-08新增）：只看基本面或只看技术面不完整。新规则：长线看好60%+短线看好40%=综合分，四象限策略矩阵决定操作。
 85. **amadeus_emotion.py输出结构变更**（2026-06-05验证）：`emotion_YYYY-MM-DD.json`不再包含`dimensions`字典（旧文档中的`dimensions.limit_ratio.score`等路径不存在）。当前结构为扁平化：`score`/`level`/`components`(维度名称列表)/`missing`/`weights_used`/`data_completeness`/`data_freshness`。各维度分数详情只在脚本控制台输出中，不在JSON中。详见`references/json-cache-structures.md`。
 86. **amadeus_emotion.py --json参数陷阱**（2026-06-04-05反复出现）：`--json`参数在某些上下文中被脚本当作日期字符串处理，导致输出含"使用2026-05-18的数据"警告且数据过期。最佳做法：不传参数直接运行，或用`python3 -c "import amadeus_emotion; ..."`直接调用。
 87. **晚间复盘数据采集降级**（2026-06-05总结）：晚间复盘（21:00）时amadeus_news_scanner.py和amadeus_external.py均可能超时/失败。降级策略：①新闻从缓存读取（检查scan_time是否今天） ②外围市场3/5项缺失标注在数据等级中 ③板块数据AKShare RemoteDisconnected时标注缺失。报告开头用data_quality.py --report-fragment自动评估。
 88. **市场数据JSON中indices字段独立于market**（2026-06-05验证）：指数数据在`d['indices']`下（key如`sh000001`），不在`d['market']`下。market只含总貌（up/down/flat/total_amount/limit_up等）。指数涨跌幅需手动计算：`(close - t_minus_2_close) / t_minus_2_close * 100`。
+89. **观察池数据源不统一**（2026-06-08发现）：pool_state.json、session_context.json、pool_manager.py各自维护不同数据。修复：session_context.json为唯一数据源，pool_state.json自动同步，pool_manager.py v3.0统一管理。详见`references/pool-pitfalls.md`。
+90. **无逻辑入池陷阱**（2026-06-08纠正）：涨停股直接入池没有逻辑假设，变成"热点收藏夹"。铁律：入池必须填写完整逻辑假设，否则不允许入池。
+91. **观察池目的不清**（2026-06-08用户纠正）：观察池是"逻辑实验场"不是"热点收藏夹"，目的是通过持续验证建立可复制的选股逻辑体系。
+92. **双维度评估缺失**（2026-06-08新增）：只看基本面或只看技术面不完整。新规则：长线看好60%+短线看好40%=综合分，四象限策略矩阵决定操作。
+93. **日期判断错误**（2026-06-08教训）：把周一说成周日，导致判断"今天休市"。日期信息已在对话开头提供，必须仔细阅读。
+89. **市场缓存indices可能过期**（2026-06-08发现）：`market_YYYY-MM-DD.json`中indices数据可能显示前一日收盘价（如4027.736），而实际收盘是3959.34。market breadth（up/down/limit_up）是实时的但indices未更新。**验证方法**：比较indices.close与前一日文件是否相同；如果相同则用腾讯API `qt.gtimg.cn` 直接获取真实收盘价。**写辅助脚本到/tmp**避免f-string嵌套问题。
+90. **腾讯API股票代码前缀规则**（2026-06-08确认）：600xxx/601xxx/688xxx = `sh`，000xxx/002xxx/300xxx/301xxx = `sz`。写批量查询脚本时务必按此规则生成前缀，不能用原始代码前两位。
+91. **execute_code中写辅助脚本到/tmp**（2026-06-08验证）：需要批量API调用或多行逻辑时，先`write_file`到`/tmp/get_xxx.py`再`terminal("python3 /tmp/get_xxx.py")`，比inline f-string嵌套可靠得多（避免转义地狱）。
 
 **Humanizer必须在cron prompt中显式执行**（2026-05-22教训）：cron prompt中加显式步骤`python3 humanize_auto.py <文件> --inplace`
 **to_docx可靠调用**：`references/to_docx-reliable-usage.md`（2026-06-04：管道模式在execute_code中静默失败，改用直接import调用）
@@ -518,7 +567,7 @@ pytest ~/.hermes/scripts/amadeus/tests/test_pantalone_data.py -v
 81. **禁止只用ML分析股票**（2026-05-25用户纠正）：必须使用完整的OCIFQ+ML六维评分体系，ML只占30%。使用`ocifq_ml_selector.py`整合脚本
 82. **Cron限流规则强化**（2026-05-26教训）：收盘后任务密集排布，盘中异动改为每小时。Discord已配置为主推送渠道
 83. **收盘复盘v3模板**（2026-05-27升级）：新增30秒速读/预测命中率/规则系统R-xx/五级分类/继承项/数据源标注。详见`templates/review_template.md`
-84. **amadeus_news_scanner.py频繁超时**（2026-05-29验证）：`scan --json`（120s超时）和`hotspots`（60s超时）在cron上下文中经常失败。降级策略：直接从东方财富/财联社网页抓取热点，或跳过新闻板块在报告中标注"新闻采集超时"。不要无限等待新闻脚本。
+84. **amadeus_news_scanner.py频繁超时**（2026-05-29验证，2026-06-08追加）：`scan --json`（120s超时）、`hotspots`（60s超时）、以及`scan`（无--json，在财联社API步骤卡死>300s）均可能失败。降级策略：①直接从东方财富/财联社网页抓取热点 ②用AKShare `stock_zt_pool_em()`获取涨停池手动入池 ③跳过新闻板块在报告中标注"新闻采集超时"。详见`references/manual-pool-addition-workflow.md`。
 85. **amadeus_realtime.py不支持逗号分隔批量查询**（2026-05-29发现）：`amadeus_realtime.py 601138,300502,002475`返回"数据不足30日"错误。应逐只查询或用空格分隔。
 86. **决策日志验证规则**（2026-05-30新增）：收盘复盘必须验证decision_log.json中pending预判。大盘方向±0.2%阈值，板块前1/3命中，个股方向一致命中。滚动20次命中率<50%触发改进闭环。详见self-improvement skill Section十七。
 87. **Cron prompt从jobs.json提取需特殊处理**（2026-05-30发现）：`~/.hermes/cron/jobs.json`中prompt字段含unicode转义（`\uXXXX`），直接`json.loads`会因嵌套引号失败。正确方法：写Python脚到文件→逐字符扫描找字符串边界→`json.loads('"' + raw + '"')`解码。详见`references/cron-prompt-extraction.md`。
@@ -527,8 +576,28 @@ pytest ~/.hermes/scripts/amadeus/tests/test_pantalone_data.py -v
 90. **execute_code中terminal返回值格式**（2026-06-02发现）：`terminal("cat file")`返回`{"output": "...", "exit_code": 0}`，output是纯字符串可直接`json.loads`。但需注意如果命令失败（exit_code!=0），output可能含错误信息不是JSON。
 91. **东财API限流铁律**（2026-06-03验证）：所有eastmoney.com请求必须走`em_get()`统一入口（1s间隔+随机抖动+会话复用）。push2.eastmoney.com不稳定（偶尔502），datacenter-web.eastmoney.com稳定。数据源优先级：腾讯/同花顺（不封IP）> 东财datacenter（有风控）> 东财push2（不稳定）。
 92. **外部数据工具集成方法论**（2026-06-03总结）
-93. **to_docx.py管道在execute_code中静默失败**（2026-06-04发现）：`cat file | python3 to_docx.py`在execute_code环境中可能不生成文件、无输出、无报错。**可靠替代**：直接Python import调用`md_to_docx(content, title, path)`。调用后必须`ls -la`验证文件生成。
-94. **amadeus_emotion.py --json被误解析为日期**（2026-06-04发现）：`--json`参数在某些上下文中被脚本当作日期字符串处理，导致输出含"使用2026-05-18的数据"警告且数据过期。解决：检查emotion脚本的参数解析逻辑，或改用`python3 -c "import amadeus_emotion; ..."`直接调用。：①下载SKILL.md理解覆盖范围 ②逐端点实测（写脚本+记录状态/延迟/质量） ③对比现有系统识别重叠/互补/独占 ④只集成独占+互补端点 ⑤创建补充skill（独立SKILL.md+CLI脚本） ⑥更新工作流（新Agent/升级现有/并行架构） ⑦更新报告模板。详见`pantalone/references/a-stock-data-integration.md`。
+93. **观察池必须逻辑驱动**（2026-06-08教训）：观察池不是"热点收藏夹"，入池必须有逻辑假设（假设+验证时间+成功标准+失败标准）。无逻辑入池的股票必须退池。详见`references/pool-philosophy-v2.md`。
+94. **观察池双维度评估**（2026-06-08新增）：长线看好（基本面60%）+短线看好（技术面40%）=综合分。四象限策略矩阵：核心持仓/激进买入/逢低布局/观察验证。详见`references/dual-dimension-evaluation.md`。
+95. **观察池数据源统一**（2026-06-08修复）：pool_state.json和session_context.json数据不一致。修复：session_context.json为唯一数据源，pool_state.json自动同步（调用sync_pool_state()）。禁止直接修改pool_state.json。
+96. **观察池自动扫描**（2026-06-08新增）：观察池应主动扫描全市场，不是被动等待入池。三类扫描：ML信号（每日16:00）、行业轮动（每日16:30）、新闻热点（每日17:00）。详见`references/auto-scan-mechanism.md`。
+97. **入池必须有评分**（2026-06-08教训）：新入池的股票需要补充长线/短线评分，否则综合分为0，无法正确排序。入池后应尽快评估评分。
+98. **新闻热点入池需谨慎**（2026-06-08教训）：新闻热点扫描入池的股票，如果新闻缓存过期（>7天），入池的逻辑假设可能已失效。应检查新闻日期，过期新闻不入池。
+94. **to_docx.py管道在execute_code中静默失败**（2026-06-04发现）：`cat file | python3 to_docx.py`在execute_code环境中可能不生成文件、无输出、无报错。**可靠替代**：直接Python import调用`md_to_docx(content, title, path)`。调用后必须`ls -la`验证文件生成。
+95. **观察池必须有逻辑假设**（2026-06-08用户纠正）：观察池是"逻辑实验场"不是"热点收藏夹"。入池必须有：逻辑假设（type/hypothesis）、验证时间（verify_date）、成功标准（success_criteria）、失败标准（failure_criteria）。无逻辑不入池，涨停股不能直接塞入。
+96. **检查日期前先确认周几**（2026-06-08教训）：不要凭感觉说"周日"，2026-06-08是周一交易日，我说成了周日导致跳过新闻扫描。必须先用datetime确认实际星期。
+97. **观察池数据源统一**（2026-06-08重构）：session_context.json是唯一数据源，pool_state.json通过pool_manager.py sync自动同步。不能有两个独立的池子数据。
+98. **财报关键词融入OCIFQ**（2026-06-08新增）：知乎职业投资人方法论——关注财报中的10个关键词（产品供不应求、行业高景气度上行等），对应OCIFQ五维评分。详见`references/financial-keyword-filter.md`。
+95. **观察池必须有逻辑假设**（2026-06-08用户纠正）：不能把涨停股直接塞入池子。入池必须填写：假设、催化剂、成功标准、失败标准、验证时间。无逻辑不入池。详见`references/pool-philosophy-v2.md`。
+96. **短线验证期=1天**（2026-06-08用户纠正）：用户明确要求验证期1天而非14天，"不然短线怎么办"。短线逻辑：今天入池→明天验证→快速决策。
+97. **pool_manager.py v3.0统一数据源**（2026-06-08重构）：session_context.json是唯一数据源，pool_state.json通过sync命令同步。旧的pool_manager_v2.py已删除。
+98. **财报关键词筛选**（2026-06-08新增）：知乎职业投资人方法——财报季看业绩大增+关键词（供不应求/高景气度/超预期/供给偏紧/需求旺盛）。pool_auto_scanner.py --financial-only。
+99. **pool_manager.py语法陷阱**（2026-06-08）：Python 3.11 f-string内不允许反斜杠，f-string内不能用`{s[\"key\"]}`。解决：用变量提取后再format，或用字符串拼接。
+94. **amadeus_emotion.py --json被误解析为日期**（2026-06-04发现）：`--json`参数在某些上下文中被脚本当作日期字符串处理，导致输出含"使用2026-05-18的数据"警告且数据过期。解决：检查emotion脚本的参数解析逻辑，或改用`python3 -c "import amadeus_emotion; ..."`直接调用。
+95. **pool_manager.py读session_context.json，不是pool_state.json**（2026-06-08发现）：`pool_manager.py scan_pool()`读取`ctx.get("stock_notes", {})`（session_context.json），`pool_state.json`是旧格式OCIFQ扫描结果，两者无关。检查池子状态应读session_context.json的stock_notes字段。pool_state.json的pools结构是`{"A池": {"stocks": [], "description": ""}, ...}`，而session_context的stock_notes结构是`{"600519": {"pool": "B", "status": "观察", ...}, ...}`。
+96. **amadeus_news_scanner.py scan命令也会超时**（2026-06-08验证）：不仅`hotspots`超时，`scan`命令在财联社API步骤也会卡死（>300s）。降级策略：用AKShare `stock_zt_pool_em()`获取涨停池手动入池。详见`references/manual-pool-addition-workflow.md`。
+97. **stock_notes中pool字段值是"A"/"B"/"C"/"退池"**（2026-06-08确认）：不是"A池"/"B池"/"C池"。退池标记为"退池"字符串。
+95. **pool_state.json结构是dict套dict**（2026-06-08发现）：`pools["B池"]["stocks"]`是dict keyed by stock code，不是list。写解析代码前必须读`references/json-cache-structures.md`确认结构，不能假设。
+96. **新闻扫描入池降级路径**（2026-06-08总结）：amadeus_news_scanner.py超时(>90s)且news_scan_*.json缓存过期时的处理：①尝试从新浪/财联社/东财API直接抓取热点 ②如仍失败，标注"新闻采集超时，无新入池候选"在报告中 ③周末/节假日新闻少属正常，不必强求入池。详见`references/json-cache-structures.md`的"Read Before You Code"章节。：①下载SKILL.md理解覆盖范围 ②逐端点实测（写脚本+记录状态/延迟/质量） ③对比现有系统识别重叠/互补/独占 ④只集成独占+互补端点 ⑤创建补充skill（独立SKILL.md+CLI脚本） ⑥更新工作流（新Agent/升级现有/并行架构） ⑦更新报告模板。详见`pantalone/references/a-stock-data-integration.md`。
 
 ## ML模拟盘验证系统（2026-05-25新增）
 

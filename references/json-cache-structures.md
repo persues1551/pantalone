@@ -54,6 +54,25 @@ Path: `~/.hermes/cache/amadeus/market_YYYY-MM-DD.json`
 - `market.up` not `market.up_count`
 - **`market.limit_up` vs `pools.limit_up_count`可能不同**（2026-06-05发现）：`market.limit_up`是新浪返回的所有收盘涨停股（如107只），`pools.limit_up_count`是从连板/首板统计的（如66只）。情绪温度脚本用的是pools数据，但市场总貌用的是market数据。报告中引用涨停数时需注明来源
 - **指数数据在`d['indices']`下**，不在`d['market']`下。market只含总貌（up/down/flat/total_amount/limit_up等）
+- **⚠️ indices可能过期（2026-06-08发现）**：amadeus_data.py采集的indices可能显示前一日收盘价，而market breadth是实时的。验证方法：比较两个日期文件的`indices.sh000001.close`，如果完全相同则indices未更新。修复：用腾讯API `qt.gtimg.cn` 直接获取真实收盘价
+
+### Verifying Stale Indices
+
+If `indices.sh000001.close` in today's file equals yesterday's file, the indices are stale. Get real values:
+
+```python
+# Write to /tmp/get_index.py then run via terminal()
+import urllib.request
+for code, name in [('sh000001','上证'), ('sz399001','深成'), ('sz399006','创业板')]:
+    url = f'http://qt.gtimg.cn/q={code}'
+    req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+    resp = urllib.request.urlopen(req, timeout=10)
+    parts = resp.read().decode('gbk', errors='replace').split('~')
+    # parts[3]=current, parts[4]=prev_close, parts[31]=change, parts[32]=pct
+    print(f'{name}: {parts[3]} ({parts[32]}%)')
+```
+
+**Stock code prefixes**: 600xxx/601xxx/688xxx → `sh`, 000xxx/002xxx/300xxx/301xxx → `sz`
 
 ## pool_state.json
 
@@ -93,9 +112,15 @@ Path: `~/.hermes/cache/amadeus/emotion_YYYY-MM-DD.json`
 
 ```json
 {
-  "score": 83,
-  "level": "退潮",
-  "components": ["涨停跌停比", "市场宽度", "连板高度", "炸板率", "成交额变化"],
+  "score": 58,
+  "level": "升温",
+  "components": {
+    "涨停跌停比": {"score": 8.1, "max": 25, "detail": "57涨/35跌 比值1.6"},
+    "市场宽度": {"score": 11.9, "max": 25, "detail": "涨停57只(代理)"},
+    "连板高度": {"score": 20, "max": 20, "detail": "最高10板"},
+    "炸板率": {"score": 3, "max": 15, "detail": "跌停35只(代理)"},
+    "成交额变化": {"score": 15, "max": 15, "detail": "成交额28229亿"}
+  },
   "missing": [],
   "weights_used": 100,
   "weights_total": 100,
@@ -105,11 +130,10 @@ Path: `~/.hermes/cache/amadeus/emotion_YYYY-MM-DD.json`
 ```
 
 ### Pitfalls
-- **无`dimensions`字段**：各维度详情不在此JSON中，需运行 `amadeus_emotion.py` 的控制台输出才能看到各维度分数
+- **`components`是dict（2026-06-08验证）**：每个维度有`score`/`max`/`detail`三个字段，不是简单列表。旧文档说"各维度分数详情只在控制台输出中"已不准确
 - **`level`字段是中文**："退潮"/"升温"/"过热"等
-- **`components`是维度名称列表**，不是分数对象
 - **`score`是总分**（满分100），直接使用即可
-- 旧文档中引用的`dimensions.limit_ratio.score`等路径不存在
+- **情绪温度可能与实际体感严重脱节**（2026-06-08实例）：score=58"升温"但实际涨跌比898:4591(16%上涨)。原因：市场宽度因子用`pools.limit_up_count`(57只连板统计)而非`market.limit_up`(80只全市场涨停)。当跌停>涨停时，连板高度(10板)和成交额(2.8万亿)仍给高分，拉高总分
 
 ## global_YYYY-MM-DD.json
 
@@ -180,4 +204,17 @@ import json
 with open('/path/to/file.json') as f:
     d = json.load(f)
 # then access d['market']['up'] etc.
+```
+
+## ⚠️ Read Before You Code (2026-06-08)
+
+**铁律**：写任何解析JSON缓存文件的代码前，必须先读本文件确认结构。
+
+反面案例：写代码假设`pools["B池"]["stocks"]`是list并用`stocks[:3]`切片，实际是dict keyed by stock code，触发`TypeError: unhashable type: 'slice'`。
+
+正确做法：
+```python
+stocks = pools["B池"]["stocks"]  # dict, not list
+for code, info in list(stocks.items())[:3]:
+    print(code, info.get("name", ""))
 ```
