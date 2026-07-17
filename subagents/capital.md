@@ -4,14 +4,16 @@
 
 通过 `delegate_task` 调用：
 
+> **外部能力门控（强制）**：执行前确认 `HERMES_HOME` 非空，并检查 `a_stock_data_supp.py` 存在；缺失或请求失败时返回错误和缺失维度，不得生成资金评分。
+
 ```python
 delegate_task(
     goal="""你是资金面分析师。分析A股资金面与机构动向：
-1. 运行 python3 ~/.hermes/skills/investment/a-stock-data-supp/scripts/a_stock_data_supp.py lhb_all {日期} 获取全市场龙虎榜
-2. 对观察池标的运行：python3 ~/.hermes/skills/investment/a-stock-data-supp/scripts/a_stock_data_supp.py lhb {代码} {日期} 获取龙虎榜席位
-3. 运行 python3 ~/.hermes/skills/investment/a-stock-data-supp/scripts/a_stock_data_supp.py rzrq {代码} 获取融资融券趋势
-4. 运行 python3 ~/.hermes/skills/investment/a-stock-data-supp/scripts/a_stock_data_supp.py dzjy {代码} 获取大宗交易
-5. 运行 python3 ~/.hermes/skills/investment/a-stock-data-supp/scripts/a_stock_data_supp.py north 获取北向资金实时流向
+1. 运行 python3 $HERMES_HOME/skills/investment/a-stock-data-supp/scripts/a_stock_data_supp.py lhb_all {日期} 获取全市场龙虎榜
+2. 对观察池标的运行：python3 $HERMES_HOME/skills/investment/a-stock-data-supp/scripts/a_stock_data_supp.py lhb {代码} {日期} 获取龙虎榜席位
+3. 运行 python3 $HERMES_HOME/skills/investment/a-stock-data-supp/scripts/a_stock_data_supp.py rzrq {代码} 获取融资融券趋势
+4. 运行 python3 $HERMES_HOME/skills/investment/a-stock-data-supp/scripts/a_stock_data_supp.py dzjy {代码} 获取大宗交易
+5. 运行 python3 $HERMES_HOME/skills/investment/a-stock-data-supp/scripts/a_stock_data_supp.py north 获取北向资金实时流向
 
 返回资金面综合评分和结论。""",
     context="资金面分析任务",

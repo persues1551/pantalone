@@ -4,13 +4,15 @@
 
 通过 `delegate_task` 调用：
 
+> **外部能力门控（强制）**：下列脚本由父级 Hermes 提供。执行前必须确认 `HERMES_HOME` 非空，并逐个检查目标文件存在；缺失项写入 `errors`，不得运行或声称已采集。
+
 ```python
 delegate_task(
     goal="""你是市场数据采集专家。执行以下任务：
-1. 运行 python3 ~/.hermes/scripts/amadeus/amadeus_emotion.py 采集情绪温度
-2. 运行 python3 ~/.hermes/scripts/amadeus/amadeus_sector_flow.py 采集板块资金流
-3. 运行 python3 ~/.hermes/scripts/amadeus/amadeus_market_filter.py 采集大盘信号
-4. 运行 python3 ~/.hermes/skills/investment/a-stock-data-supp/scripts/a_stock_data_supp.py north 获取北向资金实时分钟流向
+1. 运行 python3 $HERMES_HOME/scripts/amadeus/amadeus_emotion.py 采集情绪温度
+2. 运行 python3 $HERMES_HOME/scripts/amadeus/amadeus_sector_flow.py 采集板块资金流
+3. 运行 python3 $HERMES_HOME/scripts/amadeus/amadeus_market_filter.py 采集大盘信号
+4. 运行 python3 $HERMES_HOME/skills/investment/a-stock-data-supp/scripts/a_stock_data_supp.py north 获取北向资金实时分钟流向
 
 返回结构化数据摘要。""",
     context="数据采集任务",

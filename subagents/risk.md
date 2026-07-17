@@ -4,14 +4,16 @@
 
 通过 `delegate_task` 调用：
 
+> **外部能力门控（强制）**：执行前确认 `HERMES_HOME` 非空，并逐个检查排雷和补充数据脚本存在；任何关键脚本缺失都必须进入 `critical_alerts` 或错误字段，不得给出“无风险”结论。
+
 ```python
 delegate_task(
     goal="""你是风控审查员。对观察池标的执行排雷扫描：
-1. 运行 python3 ~/.hermes/scripts/amadeus/amadeus_screening.py 获取选股结果（ST/质押/商誉/审计/现金流）
+1. 运行 python3 $HERMES_HOME/scripts/amadeus/amadeus_screening.py 获取选股结果（ST/质押/商誉/审计/现金流）
 2. 对观察池标的运行筹码分析：
-   - python3 ~/.hermes/skills/investment/a-stock-data-supp/scripts/a_stock_data_supp.py gdrs {代码} 获取股东户数变化
-   - python3 ~/.hermes/skills/investment/a-stock-data-supp/scripts/a_stock_data_supp.py jxjj {代码} {今日日期} 获取限售解禁
-   - python3 ~/.hermes/skills/investment/a-stock-data-supp/scripts/a_stock_data_supp.py dzjy {代码} 获取大宗交易
+   - python3 $HERMES_HOME/skills/investment/a-stock-data-supp/scripts/a_stock_data_supp.py gdrs {代码} 获取股东户数变化
+   - python3 $HERMES_HOME/skills/investment/a-stock-data-supp/scripts/a_stock_data_supp.py jxjj {代码} {今日日期} 获取限售解禁
+   - python3 $HERMES_HOME/skills/investment/a-stock-data-supp/scripts/a_stock_data_supp.py dzjy {代码} 获取大宗交易
 3. 检查退市风险、质押风险、商誉风险、审计意见、现金流风险
 4. 新增筹码风险：股东户数异常增加、近期大额解禁、大宗持续折价
 

@@ -4,6 +4,8 @@
 
 通过 `delegate_task` 调用：
 
+> **外部能力门控（强制）**：执行前确认 `HERMES_HOME` 非空，并检查补充数据脚本存在；缺失时保留空值并降低置信度，不得声称已取得分红或财务数据。
+
 ```python
 delegate_task(
     goal="""你是财报分析专家。分析{股票代码}的财务数据：
@@ -12,7 +14,7 @@ delegate_task(
 3. 现金流质量
 4. 估值水平（PE/PB/PEG）
 5. 与同行业对比
-6. 运行 python3 ~/.hermes/skills/investment/a-stock-data-supp/scripts/a_stock_data_supp.py fhzz {代码} 获取分红送转历史
+6. 运行 python3 $HERMES_HOME/skills/investment/a-stock-data-supp/scripts/a_stock_data_supp.py fhzz {代码} 获取分红送转历史
 
 返回财务面评分和结论。""",
     context="财报分析任务",

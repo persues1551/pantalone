@@ -4,11 +4,13 @@
 
 通过 `delegate_task` 调用：
 
+> **外部能力门控（强制）**：执行前确认 `HERMES_HOME` 非空，并检查补充数据脚本存在；脚本不可用时可使用带来源URL的Web检索降级，但必须标注缺失的结构化数据。
+
 ```python
 delegate_task(
     goal="""你是研究分析师。收集和分析资料：
-1. 运行 python3 ~/.hermes/skills/investment/a-stock-data-supp/scripts/a_stock_data_supp.py report {代码} 获取东财研报列表
-2. 运行 python3 ~/.hermes/skills/investment/a-stock-data-supp/scripts/a_stock_data_supp.py gonggao {代码} 获取巨潮公告
+1. 运行 python3 $HERMES_HOME/skills/investment/a-stock-data-supp/scripts/a_stock_data_supp.py report {代码} 获取东财研报列表
+2. 运行 python3 $HERMES_HOME/skills/investment/a-stock-data-supp/scripts/a_stock_data_supp.py gonggao {代码} 获取巨潮公告
 3. 使用web_search补充政策新闻和行业报告
 4. 整理研报评级、一致预期EPS、机构覆盖情况
 

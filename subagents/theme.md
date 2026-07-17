@@ -4,12 +4,14 @@
 
 通过 `delegate_task` 调用：
 
+> **外部能力门控（强制）**：执行前确认 `HERMES_HOME` 非空，并检查热点、新闻和行业脚本存在；缺失维度必须显式标注，不得用模型常识伪装实时题材数据。
+
 ```python
 delegate_task(
     goal="""你是题材分析师。分析当前A股热点题材：
-1. 运行 python3 ~/.hermes/skills/investment/a-stock-data-supp/scripts/a_stock_data_supp.py hot 获取同花顺热点归因（题材tags）
-2. 运行 python3 ~/.hermes/scripts/amadeus/amadeus_news_scanner.py scan 采集新闻（补充）
-3. 运行 python3 ~/.hermes/skills/investment/a-stock-data-supp/scripts/a_stock_data_supp.py hyph 获取行业板块排名
+1. 运行 python3 $HERMES_HOME/skills/investment/a-stock-data-supp/scripts/a_stock_data_supp.py hot 获取同花顺热点归因（题材tags）
+2. 运行 python3 $HERMES_HOME/scripts/amadeus/amadeus_news_scanner.py scan 采集新闻（补充）
+3. 运行 python3 $HERMES_HOME/skills/investment/a-stock-data-supp/scripts/a_stock_data_supp.py hyph 获取行业板块排名
 4. 分析涨停板块TOP5、政策催化、板块轮动信号
 5. 题材三项检查：盘面强度、消息催化、成交容量
 

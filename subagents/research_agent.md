@@ -97,7 +97,7 @@ amadeus/
 │   ├── sector_analysis.md       # 板块分析模板
 │   ├── earnings_analysis.md     # 财报分析模板
 │   └── macro_analysis.md        # 宏观分析模板
-└── ~/.hermes/cache/amadeus/research/
+└── $HERMES_HOME/cache/amadeus/research/
     ├── session_<id>.json        # 研究会话数据
     └── report_<id>.md           # 生成的报告
 ```

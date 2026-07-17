@@ -4,10 +4,12 @@
 
 通过 `delegate_task` 调用：
 
+> **外部能力门控（强制）**：执行前确认 `HERMES_HOME` 非空，并检查外围市场脚本存在；不可用时仅使用带来源URL的公开数据降级，并在 `errors` 中记录。
+
 ```python
 delegate_task(
     goal="""你是宏观经济分析师。分析当前宏观环境对A股的影响：
-1. 运行 python3 ~/.hermes/scripts/amadeus/amadeus_external.py 采集外围市场数据
+1. 运行 python3 $HERMES_HOME/scripts/amadeus/amadeus_external.py 采集外围市场数据
 2. 分析国内经济数据、货币政策方向、财政政策
 3. 分析海外环境（美联储/美元/原油/黄金）
 

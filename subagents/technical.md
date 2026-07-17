@@ -4,10 +4,12 @@
 
 通过 `delegate_task` 调用：
 
+> **外部能力门控（强制）**：执行前确认 `HERMES_HOME` 非空，并检查目标脚本存在；脚本缺失或失败时写入 `errors`，不得编造指标或声称已完成技术计算。
+
 ```python
 delegate_task(
     goal="""你是技术分析专家。对观察池标的执行技术分析：
-1. 运行 python3 ~/.hermes/scripts/amadeus/amadeus_realtime.py 获取实时行情+技术指标
+1. 运行 python3 $HERMES_HOME/scripts/amadeus/amadeus_realtime.py 获取实时行情+技术指标
 2. 分析MA5/10/20/60均线位置、RSI(14)、MACD(12,26,9)
 3. 判断布林带位置、支撑位/压力位
 
