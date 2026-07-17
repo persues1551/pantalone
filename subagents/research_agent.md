@@ -111,7 +111,7 @@ amadeus/
 | amadeus_buy_scorer.py | 对研究发现的标的评分 |
 | amadeus_valuation.py | 提供估值数据 |
 | amadeus_screening.py | 排雷扫描 |
-| pool_manager.py | 自动入池/退池建议 |
+| pool_manager.py | 入池/退池建议；写入需逐次明确授权 |
 | amadeus_sim_integrate.py | 模拟盘验证 |
 
 ## 模型路由

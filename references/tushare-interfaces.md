@@ -3,7 +3,7 @@
 ## 环境
 
 - 版本：tushare 1.4.29
-- Python：`~/.hermes/hermes-agent/venv/bin/python3`（不在系统Python）
+- Python：`$HERMES_HOME/hermes-agent/venv/bin/python3`（不在系统Python）
 - 积分：120级
 
 ## ✅ 可用接口
@@ -48,11 +48,11 @@
 
 ```bash
 # 独立脚本调用（通过 venv Python subprocess）
-python3 ~/.hermes/scripts/amadeus/tushare_data.py north
-python3 ~/.hermes/scripts/amadeus/tushare_data.py shibor
-python3 ~/.hermes/scripts/amadeus/tushare_data.py cyq 600519
-python3 ~/.hermes/scripts/amadeus/tushare_data.py top10
-python3 ~/.hermes/scripts/amadeus/tushare_data.py daily 600519
+python3 $HERMES_HOME/scripts/amadeus/tushare_data.py north
+python3 $HERMES_HOME/scripts/amadeus/tushare_data.py shibor
+python3 $HERMES_HOME/scripts/amadeus/tushare_data.py cyq 600519
+python3 $HERMES_HOME/scripts/amadeus/tushare_data.py top10
+python3 $HERMES_HOME/scripts/amadeus/tushare_data.py daily 600519
 
 # amadeus_data.py 中自动降级使用
 # collect_north_flow() AKShare失败时自动调用 Tushare

@@ -66,7 +66,7 @@ D/E仅C池，标注【纯题材票·无基本面支撑】
 ak.stock_board_industry_summary_ths()
 ```
 
-数据缓存至 `~/.hermes/cache/amadeus/sector_flow_YYYY-MM-DD.json`。
+数据缓存至 `$HERMES_HOME/cache/amadeus/sector_flow_YYYY-MM-DD.json`。
 
 ### 分析规则
 
@@ -116,7 +116,7 @@ ak.stock_board_industry_summary_ths()
 - 开盘放量+价格守住开盘价 → 强势确认
 - 开盘放量+价格跌破开盘价 → 【高开低走风险，降级】
 - 开盘缩量+价格横盘 → 【观望，等方向选择】
-- 开盘5分钟内振幅>5% → 【高波动，缩小仓位或不触发】
+- 开盘5分钟内振幅>5% → 【高波动证据】；不得据此单独缩仓，建仓建议仍须通过完整门槛和逐动作授权
 
 ## 板块内部梯队区分
 
@@ -176,10 +176,10 @@ ak.stock_board_industry_summary_ths()
 ### 用法
 
 ```bash
-python3 ~/.hermes/skills/polymarket-trade/scripts/polymarket.py trending   # 热门事件
-python3 ~/.hermes/skills/polymarket-trade/scripts/polymarket.py movers     # 24h最大波动
-python3 ~/.hermes/skills/polymarket-trade/scripts/polymarket.py calendar   # 即将结算
-python3 ~/.hermes/skills/polymarket-trade/scripts/polymarket.py digest politics  # 分类摘要
+python3 $HERMES_HOME/skills/polymarket-trade/scripts/polymarket.py trending   # 热门事件
+python3 $HERMES_HOME/skills/polymarket-trade/scripts/polymarket.py movers     # 24h最大波动
+python3 $HERMES_HOME/skills/polymarket-trade/scripts/polymarket.py calendar   # 即将结算
+python3 $HERMES_HOME/skills/polymarket-trade/scripts/polymarket.py digest politics  # 分类摘要
 ```
 
 ### 关联信号示例

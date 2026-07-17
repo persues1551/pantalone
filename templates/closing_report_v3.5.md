@@ -64,11 +64,13 @@
 
 **异动回顾**: {今日触发的异动}
 
-## 📝 观察池自动管理
+## 📝 观察池变更建议（只读）
 
-**退池**: {N只} | 原因: {止损/超时/恶化}
-**入池**: {N只} | 来源: {新闻/OCIFQ}
+**退池建议**: {N只} | 原因: {止损/超时/恶化}
+**入池建议**: {N只} | 来源: {新闻/OCIFQ}
 **当前池内**: A:{N}只 B:{N}只 C:{N}只
+
+本段只生成建议，不修改生产观察池；任何写入需用户逐次明确授权。
 
 ## 💰 模拟台账
 
@@ -110,8 +112,8 @@
 1. **A-Shares-Data**: 运行`amadeus_data.py`获取收盘数据
 2. **Risk-Alert-System**: 计算日终风险指标
 3. **OCIFQ-I维度**: 验证行业利润断层
-4. **观察池管理**: 运行`amadeus_pool_manager.py auto`
-5. **模拟台账**: 更新持仓数据
+4. **观察池检查**: 仅运行`amadeus_pool_manager.py scan/report`并生成建议，不调用`auto/apply/add/remove`
+5. **模拟台账**: 只读现有持仓数据，不更新状态
 
 ### Subagent并行任务
 
@@ -119,6 +121,6 @@
 delegate_task(tasks=[
     {"goal": "日终风险评估：计算持仓浮亏/回撤/集中度风险", "toolsets": ["terminal"]},
     {"goal": "OCIFQ行业利润断层验证：检查观察池所在行业的利润断层状态", "toolsets": ["terminal", "web"]},
-    {"goal": "观察池自动管理：运行amadeus_pool_manager.py auto", "toolsets": ["terminal"]},
+    {"goal": "观察池只读检查：仅运行scan/report，生成变更建议；禁止auto/apply/add/remove和状态写入", "toolsets": ["terminal"]},
 ])
 ```

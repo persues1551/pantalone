@@ -12,9 +12,11 @@
 """
 
 import json, glob, os, sys
+from pathlib import Path
 from datetime import date
 
-SESSIONS_DIR = os.path.expanduser("~/.hermes/sessions")
+HERMES_HOME = Path(os.environ.get("HERMES_HOME", Path.home() / ".hermes"))
+SESSIONS_DIR = HERMES_HOME / "sessions"
 
 def token_estimate_chinese(chars):
     """中英文混合 token 估算。中文约 1.3 tok/字，JSON 约 0.4 tok/字。"""

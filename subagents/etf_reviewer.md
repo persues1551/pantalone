@@ -1,4 +1,6 @@
-# ETF Reviewer Subagent v3.4
+# ETF Reviewer Subagent v3.5
+
+> **结构化输出 Schema**: `schemas.ETFReviewResult` — 见 `subagents/schemas.py`
 
 ## 执行方式
 
@@ -49,6 +51,8 @@ delegate_task(
     toolsets=["terminal", "web"]
 )
 ```
+
+存在任何Critical或Major问题、`must_fix`非空，或`conclusion`不是“通过”时，必须返回`passed=false`。
 
 ## 角色定义
 

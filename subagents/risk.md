@@ -1,5 +1,7 @@
 # 风控审查 Subagent
 
+> **结构化输出 Schema**: `schemas.RiskScreeningReport` — 见 `subagents/schemas.py`
+
 ## 执行方式
 
 通过 `delegate_task` 调用：
@@ -29,7 +31,7 @@ delegate_task(
 2. **a_stock_data_supp.py gdrs** — 股东户数变化（东财datacenter）（新增）
 3. **a_stock_data_supp.py jxjj** — 限售解禁日历（东财datacenter）（新增）
 4. **a_stock_data_supp.py dzjy** — 大宗交易（东财datacenter）（新增）
-5. **amadeus_buy_scorer.py** — 买入评分（按需）
+5. **amadeus_buy_scorer.py** — 研究评分证据（按需；评分不得自动触发交易）
 
 ## 输出格式（必须遵守）
 

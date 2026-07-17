@@ -1,0 +1,153 @@
+# Pantalone Workflow Registry
+# ============================
+# 描述分析能力的输入、输出和组合关系。
+# 本文件不是执行引擎；不会自动运行脚本、修改路由或创建Cron。
+
+version: "1.1"
+updated: 2026-07-17
+
+skills:
+  version_detector:
+    kind: reference
+    path: references/version-detection-framework.md
+    description: 版本识别方法（市场主线、阶段和证伪条件）
+    produces:
+      - current_version
+      - candidate_versions
+      - version_confidence
+    consumes: []
+
+  patch_event_tracker:
+    kind: reference
+    path: references/patch-event-tracker.md
+    description: 补丁事件跟踪方法（财报、政策和产品日历）
+    produces:
+      - upcoming_patches
+      - today_patches
+    consumes:
+      - current_version
+
+  dragon_leader_scanner:
+    kind: reference
+    path: references/dragon-leader-database.md
+    description: 龙头候选快照与可重算评分框架
+    produces:
+      - sector_leaders
+      - leader_scores
+      - etf_alternatives
+    consumes:
+      - sector_name
+
+  supply_chain:
+    kind: reference
+    path: references/supply-chain-mapping-framework.md
+    description: 供应链拆解方法（终端到材料）
+    produces:
+      - chain_map
+      - best_link
+    consumes:
+      - current_version
+
+  sector_correlation:
+    kind: reference
+    path: references/sector-correlation-database.md
+    description: 待验证的板块联动假设库
+    produces:
+      - correlation_pairs
+    consumes:
+      - sector_name
+
+  ocifq:
+    kind: reference
+    path: references/ocifq-framework.md
+    description: OCIFQ选股方法
+    produces:
+      - stock_candidates
+    consumes:
+      - current_version
+      - sector_leaders
+
+  short_term_trader:
+    kind: external_skill
+    path: $HERMES_HOME/skills/investment/short-term-trader/SKILL.md
+    required: false
+    fallback: 使用references/technical-analysis-api-patterns.md做有限手工评估，并明确标注降级
+    description: 短线技术、入场与止损评估
+    produces:
+      - tech_scores
+      - entry_levels
+      - stop_loss
+    consumes:
+      - stock_candidates
+
+  report_quality_checker:
+    kind: subagent
+    path: subagents/review.md
+    description: 报告证据、逻辑、风险和交付审查
+    produces:
+      - quality_score
+      - issues
+    consumes:
+      - report_content
+
+workflows:
+  daily_closing:
+    description: 收盘复盘
+    inputs:
+      - sector_name
+      - report_content
+    steps:
+      - version_detector
+      - dragon_leader_scanner
+      - report_quality_checker
+    suggested_schedule: "30 15 * * 1-5"
+    model_tier: "low_latency→balanced_reasoning"
+
+  evening_review:
+    description: 晚间复盘与次日条件预测
+    inputs:
+      - report_content
+    steps:
+      - version_detector
+      - patch_event_tracker
+      - report_quality_checker
+    suggested_schedule: "0 21 * * 1-5"
+    model_tier: "low_latency→balanced_reasoning"
+
+  weekly_report:
+    description: 四层框架周报
+    inputs:
+      - sector_name
+      - report_content
+    steps:
+      - version_detector
+      - supply_chain
+      - dragon_leader_scanner
+      - ocifq
+      - short_term_trader
+      - report_quality_checker
+    suggested_schedule: "5 16 * * 5"
+    model_tier: "low_latency→balanced→high_reasoning"
+
+  stock_selection:
+    description: 版本、龙头、OCIFQ与技术面选股
+    inputs:
+      - sector_name
+    steps:
+      - version_detector
+      - dragon_leader_scanner
+      - ocifq
+      - short_term_trader
+    model_tier: "low_latency→balanced→high_reasoning"
+
+  quick_scan:
+    description: 版本与龙头候选快速扫描
+    inputs:
+      - sector_name
+    steps:
+      - version_detector
+      - dragon_leader_scanner
+    model_tier: "low_latency"
+
+# 新能力接入时，应先登记kind/path/produces/consumes，再分别实现并验证
+# 调用方、路由和Cron。仅修改本文件不会产生任何运行行为。

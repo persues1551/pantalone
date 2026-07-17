@@ -22,7 +22,7 @@ Pantalone is a modular agent-based system that combines fundamental analysis (OC
 ```
 SOUL.md (philosophy & principles)
   └── router.md (task routing)
-      └── workflow.md (execution flow)
+      └── workflow_v4_unified.md (authoritative execution contract)
           └── subagents/ (7 parallel agents)
           │   ├── market_data.md
           │   ├── capital.md
@@ -94,17 +94,17 @@ python3 scripts/ocifq_ml_selector.py --stocks 600519,000858
 python3 scripts/amadeus_emotion.py
 ```
 
-### Observation Pool Management
+### Observation Pool Review
 
 ```bash
-# Auto scan + news integration
-python3 scripts/amadeus_pool_manager.py auto
-
-# Manual operations
-python3 scripts/amadeus_pool_manager.py add 600519 "贵州茅台" A
-python3 scripts/amadeus_pool_manager.py remove 600519 "止盈退出"
-python3 scripts/amadeus_pool_manager.py status
+# Read-only scan/report examples. External scripts are optional and must be
+# probed under $HERMES_HOME before use.
+python3 $HERMES_HOME/scripts/amadeus/pool_manager.py scan
+python3 $HERMES_HOME/scripts/amadeus/pool_manager.py report
 ```
+
+Pool changes are advisory by default. Any add/remove/apply/auto operation
+requires explicit user authorization for that action.
 
 ### Data Quality Check
 
@@ -129,7 +129,7 @@ pantalone/
 ├── SKILL.md              # Main documentation (entry point)
 ├── SOUL.md               # Investment philosophy & principles
 ├── router.md             # Task routing logic
-├── workflow.md           # Execution workflow
+├── workflow_v4_unified.md # Authoritative execution contract
 ├── subagents/            # Parallel agent definitions
 │   ├── market_data.md
 │   ├── capital.md
@@ -190,15 +190,14 @@ The core stock-picking methodology:
 
 Hard gates: Missing any of F's three criteria caps at grade B. F < 70 caps total at 75. ML < 30 caps at 65.
 
-## Simulation Rules
+## Research Signal Boundaries
 
-- Buy: OCIFQ+ML score >= 60
-- Sell: Score < 40
-- Stop-loss: -5%
-- Take-profit: +10%
-- Max holding: 5 days
-- Max positions: 5
-- Position sizing: Score-based (10%-25% of capital)
+- OCIFQ and ML scores are research evidence, not trade instructions.
+- Stock stop-loss rules come only from the A+/A/B/C contract in `rules/pool_rules.md`.
+- Stock take-profit rules come only from the +12%/+20%/+30% contract in `rules/risk_rules.md`.
+- Technical indicators and holding periods cannot independently trigger stock actions.
+- A single stock may not exceed 25% of capital; the minimum trading lot is not an exception.
+- Any simulated or production state change requires explicit authorization for that action.
 
 ## Disclaimer
 

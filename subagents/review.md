@@ -1,4 +1,6 @@
-# Review Subagent 规则 v3.3 — 审查复盘型（带执行能力）
+# Review Subagent 规则 v3.4 — 审查复盘型（带执行能力）
+
+> **结构化输出 Schema**: `schemas.ReviewResult` — 见 `subagents/schemas.py`
 
 ## 〇、执行方式
 
@@ -101,6 +103,8 @@ Review Subagent 必须回答：
 - 有条件通过；
 - 退回修改；
 - 否决。
+
+存在任何Critical或Major问题时不得标记`passed=true`；评分低于70时也不得通过。
 
 ## 四、Review Subagent 通用输出格式
 

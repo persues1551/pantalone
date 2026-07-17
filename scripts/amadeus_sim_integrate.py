@@ -1,12 +1,12 @@
 #!/usr/bin/python3
 """
 Amadeus 模拟盘集成脚本 v1.0
-用于cron报告中自动读取/更新模拟盘状态
+用于读取模拟盘状态。daily_update/record 会写入状态，必须获得用户逐次明确授权。
 
 用法：
   python3 amadeus_sim_integrate.py status      # 获取当前状态（JSON）
-  python3 amadeus_sim_integrate.py daily_update # 更新今日盈亏
-  python3 amadeus_sim_integrate.py record <json> # 记录交易
+  python3 amadeus_sim_integrate.py daily_update --authorized # 授权后更新今日盈亏
+  python3 amadeus_sim_integrate.py record <json> --authorized # 授权后记录交易
 """
 import sqlite3
 import json
@@ -15,8 +15,22 @@ import os
 from datetime import datetime, date
 from pathlib import Path
 
-DB_PATH = Path.home() / ".hermes" / "cache" / "amadeus" / "simulator.db"
+HERMES_HOME = Path(os.environ.get("HERMES_HOME", Path.home() / ".hermes"))
+DB_PATH = HERMES_HOME / "cache" / "amadeus" / "simulator.db"
 INIT_CAPITAL = 200000.0
+POOL_STOP_LOSS = {"A+": 0.10, "A": 0.10, "B": 0.05, "C": 0.03}
+
+
+def calculate_stop_loss(price, pool):
+    """Calculate the authoritative A+/A/B/C pool stop price."""
+    if pool not in POOL_STOP_LOSS:
+        raise ValueError(f"未知股票池: {pool}")
+    return round(price * (1 - POOL_STOP_LOSS[pool]), 2)
+
+
+def write_authorized(args):
+    """Require an explicit flag for every state-writing CLI invocation."""
+    return "--authorized" in args
 
 def get_conn():
     conn = sqlite3.connect(str(DB_PATH))
@@ -50,8 +64,10 @@ def get_status():
         "daily_pnl": daily_pnl
     }
 
-def daily_update():
+def daily_update(authorized=False):
     """更新今日盈亏（需要提供当前价格）"""
+    if not authorized:
+        return {"error": "explicit_authorization_required"}
     conn = get_conn()
     today = str(date.today())
     cur = conn.execute("SELECT * FROM daily_pnl WHERE date=?", (today,))
@@ -87,8 +103,10 @@ def daily_update():
         "pnl_total": round(closed_pnl, 2), "drawdown": round(drawdown, 2)
     }
 
-def record_trade(trade_json):
+def record_trade(trade_json, authorized=False):
     """记录交易"""
+    if not authorized:
+        return {"error": "explicit_authorization_required"}
     try:
         trade = json.loads(trade_json)
     except json.JSONDecodeError as e:
@@ -103,7 +121,11 @@ def record_trade(trade_json):
     shares = trade.get('shares', 0)
     reason = trade.get('reason', '模拟交易')
     if action == 'buy':
-        stop_loss = round(price * 0.95, 2)
+        try:
+            stop_loss = calculate_stop_loss(price, pool)
+        except ValueError as exc:
+            conn.close()
+            return {"error": str(exc)}
         conn.execute("""
             INSERT INTO positions (code, name, pool, buy_date, buy_price, shares, stop_loss, status)
             VALUES (?, ?, ?, ?, ?, ?, ?, 'holding')
@@ -145,12 +167,18 @@ if __name__ == "__main__":
     if cmd == "status":
         print(json.dumps(get_status(), ensure_ascii=False, indent=2))
     elif cmd == "daily_update":
-        print(json.dumps(daily_update(), ensure_ascii=False, indent=2))
+        if not write_authorized(sys.argv[1:]):
+            print("拒绝写入：daily_update 需要用户逐次明确授权并传入 --authorized")
+            sys.exit(2)
+        print(json.dumps(daily_update(authorized=True), ensure_ascii=False, indent=2))
     elif cmd == "record":
         if len(sys.argv) < 3:
-            print("用法: python3 amadeus_sim_integrate.py record '<json>'")
+            print("用法: python3 amadeus_sim_integrate.py record '<json>' --authorized")
             sys.exit(1)
-        print(json.dumps(record_trade(sys.argv[2]), ensure_ascii=False, indent=2))
+        if not write_authorized(sys.argv[1:]):
+            print("拒绝写入：record 需要用户逐次明确授权并传入 --authorized")
+            sys.exit(2)
+        print(json.dumps(record_trade(sys.argv[2], authorized=True), ensure_ascii=False, indent=2))
     else:
         print(f"未知命令: {cmd}")
         sys.exit(1)

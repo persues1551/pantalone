@@ -21,10 +21,13 @@
 
 | 池子 | 数量 | 定位 | 评级要求 |
 |------|------|------|----------|
+| A+池 | 动态 | OCIFQ连续验证的最高确信标的 | 仅由OCIFQ评级产生 |
 | A池 | 3-5只 | 长期价值 | A/B级 |
 | B池 | 4-6只 | 价值-技术共振 | A/B/C级 |
 | C池 | 3-5只 | 情绪样本 | C/D/E级 |
 | D/E | 仅C池 | 纯题材票 | D/E级 |
+
+A+首先是OCIFQ研究评级。高分只能生成“A+评级候选”；完成连续季报、风险和失效条件验证并获得用户明确授权后，才可写入A+池。板块速筛、技术共振或ML分数不得直接自动入A+池。
 
 ## 模拟计划规则
 
@@ -38,34 +41,9 @@
 
 → "模拟盘：今日不触发，等待数据补全。"
 
-## 默认观察池 v1.8.1（20只+，每次复盘动态更新）
+## 运行池状态
 
-**A池(长期价值)**：
-- 600900 长江电力
-- 600519 贵州茅台
-- 000333 美的集团
-- 600036 招商银行
-- 600941 中国移动
-- 601088 中国神华
-
-**B池(价值-技术共振)**：
-- 300124 汇川技术
-- 002463 沪电股份
-- 000063 中兴通讯
-- 002475 立讯精密
-- 300502 新易盛
-- 601138 工业富联
-- 300308 中际旭创
-- 002334 英威腾
-- 002281 光迅科技
-
-**C池(情绪样本)**：
-- 600396 华电辽能
-- 002081 金螳螂
-- 600726 华电能源
-- 605006 山东玻纤
-- 688008 澜起科技
-- 300302 同有科技
+实际观察池属于父级 Hermes 的持续运行状态，不在本 Skill 中固化股票清单。读取前检查 `HERMES_HOME` 非空，并从父级观察池状态文件或只读报告获取；不得用本文档中的历史样例替代当前状态。
 
 ## 观察股扩展规则
 
@@ -76,7 +54,7 @@
 - C池新候选标准：连板股、题材龙头、换手>15%短线活跃股
 - 超买+缩量+高位（RSI>75+量比<0.8+位置>90%）的新候选只放C池标注【赶顶信号】，不进B池
 
-## 自动入池规则
+## 入池建议规则
 
 | 条件 | 说明 |
 |------|------|
@@ -86,74 +64,76 @@
 | 板块匹配 | 映射到已知板块（半导体/AI/新能源/消费电子/汽车/农业/航空/金融/军工/医药） |
 | 池子分配 | 基本面强→A池，技术共振→B池，情绪题材→C池 |
 
-## 自动退池规则
+## 退池建议规则
 
 | 条件 | 动作 | 时限 |
 |------|------|------|
-| 止损 | B池-5%, A池-8% | 立即 |
-| 超时无触发 | C池>15天→退池, B池>30天→降级C | 每日检查 |
-| 赶顶信号 | RSI>75+量比<0.8+位置>90% | 降级C |
-| 基本面恶化 | ST/非标审计/质押>70% | 直接退池 |
+| 止损 | A+池 -10%，A池 -10%，B池 -5%，C池 -3% | 立即生成止损建议，待授权 |
+| 超时无触发 | A+池 180天，A池 180天，B池 60天，C池 30天；按 A+→A→B→C→退池评估 | 生成降级建议，待授权 |
+| 赶顶信号 | RSI>75+量比<0.8+位置>90% | 生成降级C建议，待授权 |
+| 基本面恶化 | ST/非标审计/质押>70% | 生成退池建议，待用户明确授权 |
 | 板块退潮 | 连续3日资金净流出 | 标记观察 |
-| 触发失效 | 失效条件达成 | 退池 |
+| 触发失效 | 失效条件达成 | 生成退池建议，待授权 |
 
 ## 新闻扫描器
 
-**脚本**：`scripts/amadeus/amadeus_news_scanner.py`
+**外部脚本**：`$HERMES_HOME/scripts/amadeus/amadeus_news_scanner.py`（执行前检查存在）
 **数据源**：东方财富(200条) + 财联社(20条) + 新浪(20条) + 同花顺(20条)
 **功能**：自动采集→去重→情绪评分(-5~+5)→板块映射→个股提取→入池建议
 
 ```bash
 # 全量扫描（输出JSON到缓存+stdout）
-/usr/bin/python3 ~/.hermes/scripts/amadeus/amadeus_news_scanner.py scan
+/usr/bin/python3 $HERMES_HOME/scripts/amadeus/amadeus_news_scanner.py scan
 
 # 只看重大利好/利空
-/usr/bin/python3 ~/.hermes/scripts/amadeus/amadeus_news_scanner.py hotspots
+/usr/bin/python3 $HERMES_HOME/scripts/amadeus/amadeus_news_scanner.py hotspots
 ```
 
-**输出缓存**：`~/.hermes/cache/amadeus/news_scan_YYYY-MM-DD_HHMM.json`
+**输出缓存**：`$HERMES_HOME/cache/amadeus/news_scan_YYYY-MM-DD_HHMM.json`
 
 ## 观察池管理器
 
-**脚本**：`scripts/amadeus/amadeus_pool_manager.py`
-**功能**：自动入池/退池/降级/止损/超时检测/赶顶检测/新闻整合
+**外部脚本**：`$HERMES_HOME/scripts/amadeus/amadeus_pool_manager.py`（执行前检查存在）
+**功能**：扫描入池/退池/降级/止损/超时/赶顶条件并生成建议；写入需逐次明确授权
 
-**自动执行命令**（推荐）：
+**写入命令**（仅在用户明确授权生产观察池写入时执行）：
 ```bash
-# 一键自动执行：扫描退池+新闻入池+记录日志
-/usr/bin/python3 ~/.hermes/scripts/amadeus/amadeus_pool_manager.py auto
+# 授权后批量应用：扫描退池+新闻入池+记录日志
+/usr/bin/python3 $HERMES_HOME/scripts/amadeus/amadeus_pool_manager.py auto
 ```
 
-**日志文件**：`~/.hermes/cache/amadeus/pool_changes.log`（所有入池/退池操作自动记录）
+**日志文件**：`$HERMES_HOME/cache/amadeus/pool_changes.log`（所有入池/退池操作自动记录）
 
 ```bash
 # 查看池状态报告
-/usr/bin/python3 ~/.hermes/scripts/amadeus/amadeus_pool_manager.py report
+/usr/bin/python3 $HERMES_HOME/scripts/amadeus/amadeus_pool_manager.py report
 
 # 扫描退池条件（仅扫描，不执行）
-/usr/bin/python3 ~/.hermes/scripts/amadeus/amadeus_pool_manager.py scan
+/usr/bin/python3 $HERMES_HOME/scripts/amadeus/amadeus_pool_manager.py scan
 
-# 执行scan的建议动作
-/usr/bin/python3 ~/.hermes/scripts/amadeus/amadeus_pool_manager.py apply
+# 执行scan的建议动作（需要用户明确授权）
+/usr/bin/python3 $HERMES_HOME/scripts/amadeus/amadeus_pool_manager.py apply
 
 # 整合新闻入池（仅建议，不执行）
-/usr/bin/python3 ~/.hermes/scripts/amadeus/amadeus_pool_manager.py integrate-news
+/usr/bin/python3 $HERMES_HOME/scripts/amadeus/amadeus_pool_manager.py integrate-news
 
-# 自动执行（scan退池+新闻入池+记录日志）← 推荐
-/usr/bin/python3 ~/.hermes/scripts/amadeus/amadeus_pool_manager.py auto
+# 授权后批量应用（scan退池+新闻入池+记录日志）
+/usr/bin/python3 $HERMES_HOME/scripts/amadeus/amadeus_pool_manager.py auto
 
-# 手动操作
-/usr/bin/python3 ~/.hermes/scripts/amadeus/amadeus_pool_manager.py add <代码> <池> "<理由>"
-/usr/bin/python3 ~/.hermes/scripts/amadeus/amadeus_pool_manager.py remove <代码> "<理由>"
+# 手动操作（需要用户明确授权）
+/usr/bin/python3 $HERMES_HOME/scripts/amadeus/amadeus_pool_manager.py add <代码> <池> "<理由>"
+/usr/bin/python3 $HERMES_HOME/scripts/amadeus/amadeus_pool_manager.py remove <代码> "<理由>"
 ```
 
-## Cron调度
+## 建议调度（描述性，不自动创建Cron）
+
+以下任务只生成扫描和变更建议。每次生产写入仍需用户逐次明确授权，Cron存在本身不构成写入授权。
 
 | 任务 | 时间 | 内容 |
 |------|------|------|
 | 新闻热点扫描 | 09:30/12:00/15:30 交易日 | 扫描重大利好/利空，推送到微信 |
-| 观察池自动管理 | 16:00 交易日 | 退池检查+新闻入池+执行变更 |
-| ETF池自动管理 | 16:05 交易日 | ETF退池检查+新闻入池+执行变更 |
+| 观察池管理建议 | 16:00 交易日 | 退池检查+新闻候选+生成变更建议 |
+| ETF池管理建议 | 16:05 交易日 | ETF退池检查+新闻候选+生成变更建议 |
 
 ## 注意事项
 
@@ -165,8 +145,8 @@
 
 ## ETF观察池管理器
 
-**脚本**：`scripts/amadeus/amadeus_etf_pool_manager.py`
-**功能**：ETF自动入池/退池/降级/止损/折溢价检查/流动性检查/18项风险扫描
+**外部脚本**：`$HERMES_HOME/scripts/amadeus/amadeus_etf_pool_manager.py`（执行前检查存在）
+**功能**：扫描ETF入池/退池/降级/止损、折溢价、流动性和18项风险并生成建议；写入需逐次明确授权
 
 **ETF类型与止损线**：
 
@@ -185,18 +165,18 @@
 
 **执行命令**：
 ```bash
-# 一键自动：扫描退池+新闻入池+日志
-/usr/bin/python3 ~/.hermes/scripts/amadeus/amadeus_etf_pool_manager.py auto
+# 授权后批量应用：扫描退池+新闻入池+日志
+/usr/bin/python3 $HERMES_HOME/scripts/amadeus/amadeus_etf_pool_manager.py auto
 
 # 查看ETF池状态
-/usr/bin/python3 ~/.hermes/scripts/amadeus/amadeus_etf_pool_manager.py report
+/usr/bin/python3 $HERMES_HOME/scripts/amadeus/amadeus_etf_pool_manager.py report
 
 # 18项风险检查
-/usr/bin/python3 ~/.hermes/scripts/amadeus/amadeus_etf_pool_manager.py risk <代码>
+/usr/bin/python3 $HERMES_HOME/scripts/amadeus/amadeus_etf_pool_manager.py risk <代码>
 
-# 手动操作
-/usr/bin/python3 ~/.hermes/scripts/amadeus/amadeus_etf_pool_manager.py add <代码> <池> "<理由>" [类型]
-/usr/bin/python3 ~/.hermes/scripts/amadeus/amadeus_etf_pool_manager.py remove <代码> "<理由>"
+# 手动操作（需要用户明确授权）
+/usr/bin/python3 $HERMES_HOME/scripts/amadeus/amadeus_etf_pool_manager.py add <代码> <池> "<理由>" [类型]
+/usr/bin/python3 $HERMES_HOME/scripts/amadeus/amadeus_etf_pool_manager.py remove <代码> "<理由>"
 ```
 
-**日志文件**：`~/.hermes/cache/amadeus/etf_pool_changes.log`
+**日志文件**：`$HERMES_HOME/cache/amadeus/etf_pool_changes.log`

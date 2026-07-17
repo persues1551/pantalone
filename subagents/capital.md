@@ -1,5 +1,7 @@
 # 资金面与机构动向 Subagent
 
+> **结构化输出 Schema**: `schemas.CapitalFlowReport` — 见 `subagents/schemas.py`
+
 ## 执行方式
 
 通过 `delegate_task` 调用：

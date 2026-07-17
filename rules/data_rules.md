@@ -38,7 +38,7 @@
 
 ## 数据采集体系
 
-所有数据由以下脚本采集，缓存至 `~/.hermes/cache/amadeus/`：
+所有数据由父级 Hermes 中存在且通过检查的脚本采集，缓存至 `$HERMES_HOME/cache/amadeus/`。执行前必须检查脚本存在；缺失时标注数据缺口，不得声称已经采集：
 
 | 脚本 | 功能 |
 |------|------|
@@ -47,7 +47,7 @@
 | `amadeus_indicators.py` | 观察股 MA/MACD/RSI/布林带/量价 |
 | `amadeus_financials.py` | 个股财报(同花顺+巨潮) |
 | `amadeus_news_scanner.py` | 新闻扫描器：4源260条→去重→情绪评分→板块映射→个股提取→入池建议 |
-| `amadeus_pool_manager.py` | 观察池管理器：自动入池/退池/降级/止损/赶顶检测/新闻整合 |
+| `amadeus_pool_manager.py` | 观察池管理器：生成入池/退池/降级/止损/赶顶建议；写入需逐次明确授权 |
 | `amadeus_simulator.py` | SQLite模拟盘引擎(初始20万) |
 | `amadeus_predictions.py` | 预测存储/验证/统计闭环(每日收盘必跑) |
 | `amadeus_context.py` | 投研上下文持久化(跨天连续性，盘前加载收盘更新) |

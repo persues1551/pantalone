@@ -1,5 +1,7 @@
 # 市场数据采集 Subagent
 
+> **结构化输出 Schema**: `schemas.MarketDataReport` — 见 `subagents/schemas.py`
+
 ## 执行方式
 
 通过 `delegate_task` 调用：

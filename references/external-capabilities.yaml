@@ -1,0 +1,105 @@
+version: "1.0"
+policy:
+  default: optional
+  probe: Check HERMES_HOME is non-empty and the target is a regular file before use.
+  on_missing: Skip the capability, record the missing dependency, use the declared fallback, and never claim execution or write state.
+
+capabilities:
+  agents/amadeus-router.md:
+    required: false
+    fallback: Keep the task in Pantalone when it is investment-only; otherwise report that cross-agent routing is unavailable.
+  agents/newton.md:
+    required: false
+    fallback: Report that medical routing is unavailable; do not answer it as investment research.
+  agents/pantalone.md:
+    required: false
+    fallback: Use this Skill's SKILL.md, router.md, and workflow_v4_unified.md as the local contract.
+  agents/ricardo.md:
+    required: false
+    fallback: Report that media-writing routing is unavailable; do not emulate the missing agent.
+
+  scripts/amadeus/amadeus_emotion.py:
+    required: false
+    fallback: Use current public breadth and limit-up/down data; otherwise mark sentiment unavailable and do not score it.
+  scripts/amadeus/amadeus_etf_pool_manager.py:
+    required: false
+    fallback: Produce ETF pool recommendations only; never modify ETF state.
+  scripts/amadeus/amadeus_external.py:
+    required: false
+    fallback: Query current public macro sources; otherwise mark overseas data unavailable.
+  scripts/amadeus/amadeus_market_filter.py:
+    required: false
+    fallback: Derive a conditional market view from verified index and breadth data; otherwise do not issue a position signal.
+  scripts/amadeus/amadeus_news_scanner.py:
+    required: false
+    fallback: Use available web search or primary announcements; otherwise mark news coverage incomplete.
+  scripts/amadeus/amadeus_pool_manager.py:
+    required: false
+    fallback: Produce a read-only stock-pool recommendation; never apply, add, remove, or auto-update state.
+  scripts/amadeus/amadeus_predictions.py:
+    required: false
+    fallback: Return a read-only prediction review from supplied evidence; do not update logs.
+  scripts/amadeus/amadeus_realtime.py:
+    required: false
+    fallback: Use verified HTTPS market data and calculate indicators manually; otherwise return unknown technical status.
+  scripts/amadeus/amadeus_scratchpad.py:
+    required: false
+    fallback: Omit scratchpad statistics and state the missing history.
+  scripts/amadeus/amadeus_screening.py:
+    required: false
+    fallback: Check available primary filings and public risk data; unchecked items remain UNKNOWN, never PASS.
+  scripts/amadeus/amadeus_sector_flow.py:
+    required: false
+    fallback: Use a verified public sector-flow source; otherwise omit sector-flow ranking.
+  scripts/amadeus/main_force_detector.py:
+    required: false
+    fallback: Follow references/main-force-detection.md manually; missing dimensions remain unknown and receive no score.
+  scripts/amadeus/ml_backtest.py:
+    required: false
+    fallback: Do not report backtest metrics; describe only the validation method.
+  scripts/amadeus/ml_daily_predict.py:
+    required: false
+    fallback: Do not claim an ML prediction; use evidence-based analysis and label ML unavailable.
+  scripts/amadeus/ml_predict.py:
+    required: false
+    fallback: Omit the ML component and renormalize only explicitly defined non-ML weights, or return no composite score.
+  scripts/amadeus/ml_simulation.py:
+    required: false
+    fallback: Do not simulate trades or write state; provide a hypothetical, clearly labelled scenario only when requested.
+  scripts/amadeus/ocifq_apply.py:
+    required: false
+    fallback: Produce an OCIFQ application proposal only; no pool write is permitted.
+  scripts/amadeus/ocifq_evaluate.py:
+    required: false
+    fallback: Evaluate OCIFQ from supplied verified evidence without saving results.
+  scripts/amadeus/ocifq_ml_selector.py:
+    required: false
+    fallback: Keep OCIFQ and ML assessments separate; do not invent a combined score.
+  scripts/amadeus/pool_auto_scanner.py:
+    required: false
+    fallback: Omit automatic scanning and state that no candidates were scanned.
+  scripts/amadeus/pool_manager.py:
+    required: false
+    fallback: Produce a read-only pool proposal; never change stock pool state.
+  scripts/amadeus/pool_verify.py:
+    required: false
+    fallback: Return verification criteria and data gaps without changing grades or pool state.
+  scripts/amadeus/stop_loss_confirmation.py:
+    required: false
+    fallback: Report that automated confirmation is unavailable; do not execute a stop-loss action.
+  scripts/amadeus/stop_loss_monitor.py:
+    required: false
+    fallback: Compare supplied prices with declared thresholds only; never sell or write monitoring state.
+
+  skills/investment/a-stock-data-supp/scripts/a_stock_data_supp.py:
+    required: false
+    fallback: Use primary filings and available public sources; missing fields remain unknown and are not scored.
+  skills/investment/short-term-trader/SKILL.md:
+    required: false
+    fallback: Use references/technical-analysis-api-patterns.md for a limited manual assessment and label the downgrade.
+  skills/investment/stock-picking/SKILL.md:
+    required: false
+    fallback: Use the local OCIFQ reference contract and do not claim the external selector ran.
+  skills/polymarket-trade/scripts/polymarket.py:
+    required: false
+    fallback: Omit prediction-market signals; do not substitute fabricated odds.
