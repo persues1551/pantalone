@@ -5,6 +5,7 @@ import os
 import re
 import subprocess
 import sys
+import tomllib
 from pathlib import Path
 
 import pytest
@@ -681,14 +682,14 @@ def test_optional_capability_probe_fails_closed_without_host_install(tmp_path):
 
 
 def test_release_metadata_matches_skill_contract_version():
-    project = (ROOT / "pyproject.toml").read_text()
+    project = tomllib.loads((ROOT / "pyproject.toml").read_text())
     skill = (ROOT / "SKILL.md").read_text()
-    project_version = re.search(
-        r'^version\s*=\s*["\']([^"\']+)["\']', project, re.MULTILINE
-    )
     skill_version = re.search(r"^version:\s*[\"']?([^\s\"']+)", skill, re.MULTILINE)
-    assert project_version is not None and skill_version is not None
-    assert project_version.group(1) == skill_version.group(1)
+    assert skill_version is not None
+    assert project["tool"]["pantalone"]["version"] == skill_version.group(1)
+    assert project["tool"]["pantalone"]["distribution"] is False
+    assert "build-system" not in project
+    assert "project" not in project
 
 
 def test_health_check_reports_static_scope_and_exclusions():
