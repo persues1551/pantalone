@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.util
+import json
 import os
 import re
 import subprocess
@@ -1032,6 +1033,49 @@ def test_simulator_empty_profile_is_read_only_and_writes_validated(monkeypatch, 
     assert created["status"] == "recorded"
     assert module.DB_PATH.is_file()
     assert module.get_status()["positions_count"] == 1
+
+
+def test_simulator_status_does_not_initialize_existing_empty_database(monkeypatch, tmp_path):
+    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    module = load_sim_integrator()
+    assert module.DB_PATH is not None
+    module.DB_PATH.parent.mkdir(parents=True)
+    module.DB_PATH.touch()
+
+    before = module.DB_PATH.stat()
+    assert module.get_status() == {"error": "simulator_schema_missing"}
+    after = module.DB_PATH.stat()
+    assert after.st_size == before.st_size == 0
+    assert after.st_mtime_ns == before.st_mtime_ns
+
+
+def test_simulator_rejects_explicit_empty_hermes_home(monkeypatch):
+    monkeypatch.setenv("HERMES_HOME", "")
+    module = load_sim_integrator()
+    assert module.DB_PATH is None
+    assert module.get_status() == {"error": "HERMES_HOME_must_be_nonempty"}
+    result = module.record_trade(
+        '{"action":"buy","code":"600000","price":10,"shares":100}',
+        authorized=True,
+    )
+    assert result == {"error": "HERMES_HOME_must_be_nonempty"}
+
+
+def test_simulator_sell_response_reports_actual_position_shares(monkeypatch, tmp_path):
+    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    module = load_sim_integrator()
+    bought = module.record_trade(
+        '{"action":"buy","code":"600000","pool":"B","price":10,"shares":100}',
+        authorized=True,
+    )
+    assert bought["shares"] == 100
+    position_id = module.get_status()["positions"][0]["id"]
+    sold = module.record_trade(
+        json.dumps({"action": "sell", "position_id": position_id, "price": 11}),
+        authorized=True,
+    )
+    assert sold["code"] == "600000"
+    assert sold["shares"] == 100
 
 
 def test_health_check_detects_markdown_colon_credentials_without_echoing_values(tmp_path):

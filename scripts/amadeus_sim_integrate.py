@@ -15,9 +15,15 @@ import os
 import math
 from datetime import datetime, date
 from pathlib import Path
+from urllib.parse import quote
 
-HERMES_HOME = Path(os.environ.get("HERMES_HOME", Path.home() / ".hermes"))
-DB_PATH = HERMES_HOME / "cache" / "amadeus" / "simulator.db"
+_HERMES_HOME_ENV = os.environ.get("HERMES_HOME")
+HERMES_HOME = (
+    Path.home() / ".hermes"
+    if _HERMES_HOME_ENV is None
+    else Path(_HERMES_HOME_ENV) if _HERMES_HOME_ENV.strip() else None
+)
+DB_PATH = HERMES_HOME / "cache" / "amadeus" / "simulator.db" if HERMES_HOME else None
 INIT_CAPITAL = 200000.0
 POOL_STOP_LOSS = {"A+": 0.10, "A": 0.10, "B": 0.05, "C": 0.03}
 
@@ -33,7 +39,15 @@ def write_authorized(args):
     """Require an explicit flag for every state-writing CLI invocation."""
     return "--authorized" in args
 
-def get_conn():
+def get_conn(write=False):
+    if DB_PATH is None:
+        raise ValueError("HERMES_HOME必须是非空路径")
+    if not write:
+        uri = f"file:{quote(str(DB_PATH))}?mode=ro"
+        conn = sqlite3.connect(uri, uri=True)
+        conn.row_factory = sqlite3.Row
+        return conn
+
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(str(DB_PATH))
     conn.row_factory = sqlite3.Row
@@ -93,9 +107,18 @@ def empty_status():
 
 def get_status():
     """获取模拟盘完整状态"""
+    if DB_PATH is None:
+        return {"error": "HERMES_HOME_must_be_nonempty"}
     if not DB_PATH.is_file():
         return empty_status()
-    conn = get_conn()
+    conn = get_conn(write=False)
+    tables = {
+        row["name"]
+        for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")
+    }
+    if not {"positions", "trades", "daily_pnl"}.issubset(tables):
+        conn.close()
+        return {"error": "simulator_schema_missing"}
     cur = conn.execute("SELECT * FROM positions WHERE status='holding'")
     positions = [dict(row) for row in cur.fetchall()]
     cur = conn.execute("SELECT * FROM positions WHERE status='closed'")
@@ -124,7 +147,10 @@ def daily_update(authorized=False):
     """更新今日盈亏（需要提供当前价格）"""
     if not authorized:
         return {"error": "explicit_authorization_required"}
-    conn = get_conn()
+    try:
+        conn = get_conn(write=True)
+    except ValueError:
+        return {"error": "HERMES_HOME_must_be_nonempty"}
     today = str(date.today())
     cur = conn.execute("SELECT * FROM daily_pnl WHERE date=?", (today,))
     if cur.fetchone():
@@ -198,8 +224,12 @@ def record_trade(trade_json, authorized=False):
         if isinstance(position_id, bool) or not isinstance(position_id, int) or position_id <= 0:
             return {"error": "平仓需要提供正整数position_id"}
 
-    conn = get_conn()
+    try:
+        conn = get_conn(write=True)
+    except ValueError:
+        return {"error": "HERMES_HOME_must_be_nonempty"}
     today = str(date.today())
+    actual_shares = shares
     if action == 'buy':
         try:
             stop_loss = calculate_stop_loss(price, pool)
@@ -222,6 +252,7 @@ def record_trade(trade_json, authorized=False):
             return {"error": f"持仓ID {position_id} 不存在或已平仓"}
         pos = dict(pos)
         code = pos['code']
+        actual_shares = pos['shares']
         pnl = round((price - pos['buy_price']) * pos['shares'], 2)
         pnl_pct = round((price - pos['buy_price']) / pos['buy_price'] * 100, 2)
         conn.execute("""
@@ -234,7 +265,7 @@ def record_trade(trade_json, authorized=False):
         """, (code, price, pos['shares'], round(price * pos['shares'], 2), today, reason))
     conn.commit()
     conn.close()
-    return {"status": "recorded", "action": action, "code": code, "price": price, "shares": shares}
+    return {"status": "recorded", "action": action, "code": code, "price": price, "shares": actual_shares}
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:
