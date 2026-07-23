@@ -326,6 +326,6 @@
 10. **预测验证闭环**：晚间预测→次日收盘验证→命中率→改进逻辑
 
 ## 相关文件
-- 规则系统：`references/rule-system.md`
-- 继承项系统：`references/inheritance-system.md`
+- 规则系统：`rules/`
+- 权威执行契约：`workflow_v4_unified.md`
 - 精简格式示例：用户发送的参考docx（105行，要点列表为主）

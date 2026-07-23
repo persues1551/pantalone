@@ -118,14 +118,14 @@ MA5/10/20/60/120/250、MACD(12,26,9)、RSI(14)、KDJ(9,3,3)、BOLL(20,2)、VaR(9
 
 ### Stage 2: 主力行为检测（独立，不可合并）
 
-该外部能力为`optional`。`capability probe`：确认`HERMES_HOME`非空，且脚本是存在的普通文件。`fallback`：缺失或执行失败时，按`references/main-force-detection.md`手工计算可获得的维度；缺失维度保持unknown，不生成综合主力评分，也不得声称脚本已运行。
+该外部能力为`optional`。`capability probe`：确认`HERMES_HOME`非空，且脚本是存在的普通文件。`fallback`：缺失或执行失败时，仅报告可从已核验行情、成交量和公开资金数据直接支持的信号；缺失维度保持unknown，不生成综合主力评分，也不得声称脚本已运行。
 
 ```bash
 python3 $HERMES_HOME/scripts/amadeus/main_force_detector.py <code>
 ```
 
 仅在脚本成功且五个维度数据完整时输出综合评分；否则输出已验证信号、缺失项和降级说明。
-详见 `references/main-force-detection.md`
+数据与证据要求遵循本文件Stage 1及`subagents/capital.md`。
 
 ### Stage 3: OCIFQ五维评估
 

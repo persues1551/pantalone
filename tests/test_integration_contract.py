@@ -369,6 +369,25 @@ def test_workflow_contract_remains_the_primary_entry():
     assert "references/workflow-registry.yaml" in skill
 
 
+def test_active_local_document_references_exist():
+    paths = [
+        *ACTIVE_DOCS,
+        *CORE_REFERENCES,
+        ROOT / "references/external-capabilities.yaml",
+        ROOT / "references/workflow-registry.yaml",
+    ]
+    missing = []
+    local_ref = re.compile(
+        r"(?<!\$HERMES_HOME/)(?<![A-Za-z0-9_-])"
+        r"((?:references|rules|templates|subagents)/[A-Za-z0-9_.-]+(?:/[A-Za-z0-9_.-]+)*\.(?:md|py|yaml))"
+    )
+    for source in paths:
+        for target in local_ref.findall(source.read_text()):
+            if not (ROOT / target).is_file():
+                missing.append((str(source.relative_to(ROOT)), target))
+    assert missing == []
+
+
 def test_active_research_agent_does_not_advertise_removed_local_engine():
     research_agent = (ROOT / "subagents/research_agent.md").read_text()
     assert "amadeus_research.py" not in research_agent
@@ -982,6 +1001,36 @@ def test_simulator_write_functions_fail_closed_without_authorization(monkeypatch
     assert module.daily_update() == {"error": "explicit_authorization_required"}
     assert module.record_trade("{}") == {"error": "explicit_authorization_required"}
     assert not module.DB_PATH.exists()
+
+
+def test_simulator_empty_profile_is_read_only_and_writes_validated(monkeypatch, tmp_path):
+    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    module = load_sim_integrator()
+
+    status = module.get_status()
+    assert status["total_value"] == module.INIT_CAPITAL
+    assert status["positions"] == []
+    assert not module.DB_PATH.exists()
+
+    invalid = [
+        '{"action":"hold","code":"600000","price":10,"shares":100}',
+        '{"action":"buy","code":"","price":10,"shares":100}',
+        '{"action":"buy","code":"600000","price":0,"shares":100}',
+        '{"action":"buy","code":"600000","price":10,"shares":1.5}',
+        '{"action":"sell","price":10,"position_id":0}',
+    ]
+    for payload in invalid:
+        result = module.record_trade(payload, authorized=True)
+        assert "error" in result
+        assert not module.DB_PATH.exists()
+
+    created = module.record_trade(
+        '{"action":"buy","code":"600000","name":"浦发银行","pool":"B","price":10,"shares":100}',
+        authorized=True,
+    )
+    assert created["status"] == "recorded"
+    assert module.DB_PATH.is_file()
+    assert module.get_status()["positions_count"] == 1
 
 
 def test_health_check_detects_markdown_colon_credentials_without_echoing_values(tmp_path):

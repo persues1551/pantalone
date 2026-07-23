@@ -167,7 +167,7 @@ ak.stock_board_industry_summary_ths()
 
 **铁律**：市场已低开的方向不追，设触发条件才入池，利好兑现的标的谨慎。
 
-详见 `references/geopolitical-event-analysis.md`（含特朗普访华完整案例）。
+地缘事件按 `subagents/macro.md` 收集证据，并依照本文件的事件驱动规则设置条件化触发，不引用未发布的历史案例。
 
 ## 宏观趋势观察（Polymarket 预测市场）
 

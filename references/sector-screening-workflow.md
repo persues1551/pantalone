@@ -22,7 +22,7 @@
 
 工具：web_search / Tavily 搜关键词组合，如「半导体材料 A股 龙头」「XX板块 国产替代 上市公司」
 
-⚠️ AKShare板块数据常见失败：stock_board_concept_name_em() 和 stock_board_industry_name_em() 经常超时/连接断开。替代方案：用Jina Reader抓取东方财富财经首页 https://r.jina.ai/https://finance.eastmoney.com/a/czqyw.html 获取最新行业催化新闻；或用腾讯行情API直接拉候选标的的实时数据。详见 references/proven-data-api-patterns.md。
+⚠️ AKShare板块数据常见失败：stock_board_concept_name_em() 和 stock_board_industry_name_em() 经常超时/连接断开。替代方案：用Jina Reader抓取东方财富财经首页 https://r.jina.ai/https://finance.eastmoney.com/a/czqyw.html 获取最新行业催化新闻；或用腾讯行情API直接拉候选标的的实时数据。
 
 Jina Reader新闻发现（验证：2026-07-09）：
 ```bash
@@ -82,7 +82,7 @@ for code, name in stocks:
         print(f"{rp}: 营收{rev}({rev_yoy}) 净利{profit}({profit_yoy}) 毛利率{gross}%")
 ```
 可用列：报告期, 营业总收入, 营业总收入同比增长率, 净利润, 净利润同比增长率, 扣非净利润, 基本每股收益, 每股净资产, 销售毛利率, 销售净利率, 净资产收益率
-详见 references/proven-data-api-patterns.md 第五章。
+字段口径必须与公司定期报告交叉核验；接口缺字段或口径冲突时保留unknown，不参与评分。
 
 **K线技术分析快速获取（结合Step 2筛选后使用）**：
 ```bash

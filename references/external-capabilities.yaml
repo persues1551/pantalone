@@ -53,7 +53,7 @@ capabilities:
     fallback: Use a verified public sector-flow source; otherwise omit sector-flow ranking.
   scripts/amadeus/main_force_detector.py:
     required: false
-    fallback: Follow references/main-force-detection.md manually; missing dimensions remain unknown and receive no score.
+    fallback: Report only signals supported by verified price, volume, and public capital-flow data; missing dimensions remain unknown and receive no score.
   scripts/amadeus/ml_backtest.py:
     required: false
     fallback: Do not report backtest metrics; describe only the validation method.
@@ -96,7 +96,7 @@ capabilities:
     fallback: Use primary filings and available public sources; missing fields remain unknown and are not scored.
   skills/investment/short-term-trader/SKILL.md:
     required: false
-    fallback: Use references/technical-analysis-api-patterns.md for a limited manual assessment and label the downgrade.
+    fallback: Use subagents/technical.md and rules/trading_rules.md for a limited manual assessment and label the downgrade.
   skills/investment/stock-picking/SKILL.md:
     required: false
     fallback: Use the local OCIFQ reference contract and do not claim the external selector ran.

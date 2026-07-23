@@ -12,6 +12,7 @@ import sqlite3
 import json
 import sys
 import os
+import math
 from datetime import datetime, date
 from pathlib import Path
 
@@ -33,12 +34,67 @@ def write_authorized(args):
     return "--authorized" in args
 
 def get_conn():
+    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(str(DB_PATH))
     conn.row_factory = sqlite3.Row
+    conn.executescript("""
+        CREATE TABLE IF NOT EXISTS positions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            code TEXT NOT NULL,
+            name TEXT NOT NULL DEFAULT '',
+            pool TEXT NOT NULL,
+            buy_date TEXT NOT NULL,
+            buy_price REAL NOT NULL,
+            shares INTEGER NOT NULL,
+            stop_loss REAL NOT NULL,
+            status TEXT NOT NULL,
+            close_date TEXT,
+            close_price REAL,
+            pnl REAL,
+            pnl_pct REAL,
+            notes TEXT
+        );
+        CREATE TABLE IF NOT EXISTS trades (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            code TEXT NOT NULL,
+            action TEXT NOT NULL,
+            price REAL NOT NULL,
+            shares INTEGER NOT NULL,
+            amount REAL NOT NULL,
+            date TEXT NOT NULL,
+            reason TEXT NOT NULL DEFAULT ''
+        );
+        CREATE TABLE IF NOT EXISTS daily_pnl (
+            date TEXT PRIMARY KEY,
+            total_value REAL NOT NULL,
+            cash REAL NOT NULL,
+            positions_value REAL NOT NULL,
+            pnl_day REAL NOT NULL,
+            pnl_total REAL NOT NULL,
+            drawdown REAL NOT NULL
+        );
+    """)
     return conn
+
+
+def empty_status():
+    return {
+        "initial_capital": INIT_CAPITAL,
+        "total_value": INIT_CAPITAL,
+        "total_pnl": 0.0,
+        "total_pnl_pct": 0.0,
+        "positions_count": 0,
+        "positions": [],
+        "closed_count": 0,
+        "closed_trades": [],
+        "recent_trades": [],
+        "daily_pnl": [],
+    }
 
 def get_status():
     """获取模拟盘完整状态"""
+    if not DB_PATH.is_file():
+        return empty_status()
     conn = get_conn()
     cur = conn.execute("SELECT * FROM positions WHERE status='holding'")
     positions = [dict(row) for row in cur.fetchall()]
@@ -111,15 +167,39 @@ def record_trade(trade_json, authorized=False):
         trade = json.loads(trade_json)
     except json.JSONDecodeError as e:
         return {"error": f"JSON解析失败: {e}"}
-    conn = get_conn()
-    today = str(date.today())
+    if not isinstance(trade, dict):
+        return {"error": "交易数据必须是JSON对象"}
     action = trade.get('action', 'buy')
+    if action not in {'buy', 'sell'}:
+        return {"error": f"未知交易动作: {action}"}
     code = trade.get('code', '')
+    if not isinstance(code, str):
+        return {"error": "证券代码必须是字符串"}
+    code = code.strip()
     name = trade.get('name', '')
+    if not isinstance(name, str):
+        return {"error": "证券名称必须是字符串"}
     pool = trade.get('pool', 'C')
     price = trade.get('price', 0)
     shares = trade.get('shares', 0)
     reason = trade.get('reason', '模拟交易')
+    position_id = None
+    if isinstance(price, bool) or not isinstance(price, (int, float)) or not math.isfinite(price) or price <= 0:
+        return {"error": "价格必须是大于0的有限数值"}
+    if not isinstance(reason, str):
+        return {"error": "交易原因必须是字符串"}
+    if action == 'buy':
+        if not code:
+            return {"error": "买入需要提供证券代码"}
+        if isinstance(shares, bool) or not isinstance(shares, int) or shares <= 0:
+            return {"error": "买入股数必须是正整数"}
+    else:
+        position_id = trade.get('position_id')
+        if isinstance(position_id, bool) or not isinstance(position_id, int) or position_id <= 0:
+            return {"error": "平仓需要提供正整数position_id"}
+
+    conn = get_conn()
+    today = str(date.today())
     if action == 'buy':
         try:
             stop_loss = calculate_stop_loss(price, pool)
@@ -135,16 +215,13 @@ def record_trade(trade_json, authorized=False):
             VALUES (?, 'buy', ?, ?, ?, ?, ?)
         """, (code, price, shares, round(price * shares, 2), today, reason))
     elif action == 'sell':
-        position_id = trade.get('position_id')
-        if not position_id:
-            conn.close()
-            return {"error": "平仓需要提供position_id"}
         cur = conn.execute("SELECT * FROM positions WHERE id=? AND status='holding'", (position_id,))
         pos = cur.fetchone()
         if not pos:
             conn.close()
             return {"error": f"持仓ID {position_id} 不存在或已平仓"}
         pos = dict(pos)
+        code = pos['code']
         pnl = round((price - pos['buy_price']) * pos['shares'], 2)
         pnl_pct = round((price - pos['buy_price']) / pos['buy_price'] * 100, 2)
         conn.execute("""

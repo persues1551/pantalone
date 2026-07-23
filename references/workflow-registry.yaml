@@ -71,7 +71,7 @@ skills:
     kind: external_skill
     path: $HERMES_HOME/skills/investment/short-term-trader/SKILL.md
     required: false
-    fallback: 使用references/technical-analysis-api-patterns.md做有限手工评估，并明确标注降级
+    fallback: 使用subagents/technical.md和rules/trading_rules.md做有限手工评估，并明确标注降级
     description: 短线技术、入场与止损评估
     produces:
       - tech_scores
