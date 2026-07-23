@@ -2,20 +2,16 @@
 
 AI-powered A-stock (China) investment research system. Named after the merchant character in Commedia dell'arte.
 
-Pantalone is a modular agent-based system that combines fundamental analysis (OCIFQ framework) with machine learning (LightGBM + XGBoost) to support investment research on China's A-share market.
+Pantalone is a Hermes Skill for evidence-based investment research. It ships the OCIFQ methodology, an eight-stage workflow, role prompts, rules, templates and portable helper scripts. Data, machine-learning and production-state capabilities are optional host integrations and must be probed before use.
 
 ## Key Features
 
 - OCIFQ stock picking framework (5 dimensions: Oligopoly, Catalyst, Industry profit gap, Financial triple-breakout, Quarterly consistency)
-- ML ensemble model (LightGBM + XGBoost, AUC 0.6512, 727 stocks, 606K samples, 66 features)
-- Six-dimensional scoring: OCIFQ (70%) + ML signal (30%)
-- Sentiment temperature system (market-wide emotion quantification)
-- Automated observation pool management (A/B/C tier pools with differentiated stop-loss)
-- ETF analysis with 9-category classification and A-E rating
-- Multi-source data pipeline with automatic fallback (Sina → Tencent → AKShare → Tushare)
-- Subagent architecture for parallel data collection and analysis
-- Report generation with humanizer (anti-AI-detection for Chinese text)
-- QA closed-loop testing system
+- Eight-stage deep-research contract with independent risk, compliance and final review stages
+- A+/A/B/C observation-pool contract; recommendations are read-only by default and every state change requires explicit authorization
+- ETF, market, capital-flow, financial, macro, theme, technical and risk research roles
+- Optional host data, sentiment, ML, backtest and document-generation capabilities with fail-closed fallbacks
+- Portable report templates, capability probes and integration-contract tests
 
 ## Architecture
 
@@ -23,16 +19,9 @@ Pantalone is a modular agent-based system that combines fundamental analysis (OC
 SOUL.md (philosophy & principles)
   └── router.md (task routing)
       └── workflow_v4_unified.md (authoritative execution contract)
-          └── subagents/ (7 parallel agents)
-          │   ├── market_data.md
-          │   ├── capital.md
-          │   ├── macro.md
-          │   ├── theme.md
-          │   ├── financial.md
-          │   ├── technical.md
-          │   └── risk.md
-          └── rules/ (9 rule files)
-              └── templates/ (6 report templates)
+          ├── subagents/ (specialist and supporting role contracts)
+          ├── rules/ (authoritative investment and authorization rules)
+          └── templates/ (15 active report and review templates)
 ```
 
 ## Requirements
@@ -56,15 +45,9 @@ Install or clone this repository as the `pantalone` Hermes Skill, then load it w
 | yfinance | Fundamentals (PE/PB/ROE), US stocks | Moderate (429) |
 | East Money | News, sector flow, LHB, margin trading | IP-based throttling |
 
-## ML Models
+## Optional ML Evidence
 
-| Version | Stocks | Samples | Features | CV AUC | Status |
-|---------|--------|---------|----------|--------|--------|
-| v5.1 (prod) | 727 | 606K | 66 | 0.6512 | Current best |
-| v4.7 | 733 | 556K | 38 | 0.6499 | Backup |
-| v3.5 | 99 | 76K | 41 | ~~0.7785~~ | Data leakage |
-
-Training config: n_estimators=500, lr=0.03, max_depth=7, StandardScaler, TimeSeriesSplit 5-fold.
+This repository does not ship a trained model artifact or claim that a model is deployed. ML prediction, backtest and training are optional host capabilities declared in `references/external-capabilities.yaml`. Use ML output only after verifying the script and artifact exist and recording the model version, training window, validation method, data source and `as_of` time. If any requirement is missing, keep ML fields unknown and do not apply an ML score or weight.
 
 ## Usage
 
@@ -138,13 +121,13 @@ The core stock-picking methodology:
 | I - Industry Profit Gap | 12% | Multiple companies in same industry showing synchronized improvement |
 | F - Financial Triple Breakout | 20% | Revenue >= 30% YoY + Net profit >= 50% YoY + Gross margin >= 5ppt |
 | Q - Quarterly Consistency | 9% | 4 consecutive quarters of improving revenue/profit/margin |
-| M - ML Signal | 30% | LightGBM + XGBoost ensemble score |
+| M - Optional ML evidence | Runtime-dependent | Use only after the host capability and model provenance are verified; otherwise unknown |
 
-Hard gates: Missing any of F's three criteria caps at grade B. F < 70 caps total at 75. ML < 30 caps at 65.
+The OCIFQ dimensions are the local research contract. Optional ML evidence does not receive a fixed weight merely because an external script or historical result exists.
 
 ## Research Signal Boundaries
 
-- OCIFQ and ML scores are research evidence, not trade instructions.
+- OCIFQ and any verified optional ML output are research evidence, not trade instructions.
 - Stock stop-loss rules come only from the A+/A/B/C contract in `rules/pool_rules.md`.
 - Stock take-profit rules come only from the +12%/+20%/+30% contract in `rules/risk_rules.md`.
 - Technical indicators and holding periods cannot independently trigger stock actions.

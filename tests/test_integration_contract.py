@@ -17,6 +17,7 @@ from docx import Document
 ROOT = Path(__file__).resolve().parents[1]
 CAPABILITY_MANIFEST = ROOT / "references/external-capabilities.yaml"
 ACTIVE_DOCS = [
+    ROOT / "README.md",
     ROOT / "SKILL.md",
     ROOT / "SOUL.md",
     ROOT / "router.md",
@@ -402,6 +403,23 @@ def test_readme_only_advertises_shipped_local_scripts():
     referenced = sorted(set(re.findall(r"(?<!HERMES_HOME/)scripts/([A-Za-z0-9_.-]+\.py)", readme)))
     missing = [name for name in referenced if not (ROOT / "scripts" / name).is_file()]
     assert missing == []
+
+
+def test_readme_does_not_claim_unshipped_production_capabilities():
+    readme = (ROOT / "README.md").read_text()
+    forbidden = [
+        "AUC 0.6512",
+        "727 stocks",
+        "606K samples",
+        "v5.1 (prod)",
+        "Current best",
+        "Automated observation pool management",
+        "OCIFQ (70%) + ML signal (30%)",
+    ]
+    assert [item for item in forbidden if item in readme] == []
+    assert "A+/A/B/C" in readme
+    assert "optional host capabilities" in readme
+    assert "explicit authorization" in readme
 
 
 def test_pool_rules_match_the_parent_a_plus_contract():
