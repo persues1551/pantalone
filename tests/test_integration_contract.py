@@ -369,6 +369,20 @@ def test_workflow_contract_remains_the_primary_entry():
     assert "references/workflow-registry.yaml" in skill
 
 
+def test_active_research_agent_does_not_advertise_removed_local_engine():
+    research_agent = (ROOT / "subagents/research_agent.md").read_text()
+    assert "amadeus_research.py" not in research_agent
+    assert "research_templates/" not in research_agent
+    assert "由Hermes会话按需编排" in research_agent
+
+
+def test_readme_only_advertises_shipped_local_scripts():
+    readme = (ROOT / "README.md").read_text()
+    referenced = sorted(set(re.findall(r"(?<!HERMES_HOME/)scripts/([A-Za-z0-9_.-]+\.py)", readme)))
+    missing = [name for name in referenced if not (ROOT / "scripts" / name).is_file()]
+    assert missing == []
+
+
 def test_pool_rules_match_the_parent_a_plus_contract():
     rules = (ROOT / "rules/pool_rules.md").read_text()
     assert "A+" in rules

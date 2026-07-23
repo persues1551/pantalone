@@ -37,14 +37,13 @@ SOUL.md (philosophy & principles)
 
 ## Requirements
 
-- Python 3.10+
-- Dependencies: akshare, yfinance, tushare, lightgbm, xgboost, scikit-learn, pandas, numpy, requests, beautifulsoup4, python-docx, chromadb, sentence-transformers
+- Hermes Agent with the file, web/search, delegation and terminal capabilities required by the selected workflow
+- Python 3.10+ for the optional helper scripts shipped in `scripts/`
+- External data and ML capabilities are optional and declared in `references/external-capabilities.yaml`
 
-## Quick Install
+## Installation
 
-```bash
-pip install -r requirements.txt
-```
+Install or clone this repository as the `pantalone` Hermes Skill, then load it with `/skill pantalone` or `hermes -s pantalone`. Python dependencies in `requirements.txt` are only needed when running helper or host capabilities that import them; installing those dependencies does not create a standalone Pantalone CLI.
 
 ## Data Sources
 
@@ -69,30 +68,9 @@ Training config: n_estimators=500, lr=0.03, max_depth=7, StandardScaler, TimeSer
 
 ## Usage
 
-### ML Prediction
+Start a Hermes conversation with the Skill loaded and ask for a market review, stock/ETF analysis, or full research task. Requests containing “研究”“研究一下” or “深入分析” follow the eight-stage contract in `workflow_v4_unified.md`.
 
-```bash
-# Single stock
-python3 scripts/ml_predict.py --stock 600519
-
-# Multiple stocks with report
-python3 scripts/ml_predict.py --stocks 600519,000858,300750 --report
-
-# Full observation pool
-python3 scripts/ml_predict.py --pool
-```
-
-### OCIFQ + ML Combined Scoring
-
-```bash
-python3 scripts/ocifq_ml_selector.py --stocks 600519,000858
-```
-
-### Sentiment Temperature
-
-```bash
-python3 scripts/amadeus_emotion.py
-```
+ML prediction, OCIFQ automation, sentiment, observation-pool and training scripts are optional host capabilities. Their expected `$HERMES_HOME` paths and fallbacks are defined in `references/external-capabilities.yaml`; check availability before invoking them and never report a missing script as executed.
 
 ### Observation Pool Review
 
@@ -106,20 +84,11 @@ python3 $HERMES_HOME/scripts/amadeus/pool_manager.py report
 Pool changes are advisory by default. Any add/remove/apply/auto operation
 requires explicit user authorization for that action.
 
-### Data Quality Check
+### Local Verification
 
 ```bash
-python3 scripts/data_quality.py --report-fragment
-```
-
-### QA Loop
-
-```bash
-# Full closed-loop test
-python3 scripts/qa_loop.py
-
-# Format-only (no network)
-python3 scripts/qa_loop.py --data-only
+python3 scripts/check_references_health.py --quiet
+python3 -m pytest -q tests/test_integration_contract.py
 ```
 
 ## Project Structure
@@ -139,39 +108,22 @@ pantalone/
 │   └── research.md
 ├── rules/                # Business rules
 ├── templates/            # Report templates
-├── references/           # Technical documentation (50+ files)
-└── scripts/              # Python scripts (see below)
+├── references/           # Technical documentation and capability manifest
+└── scripts/              # Portable helper and verification scripts
 ```
 
 ### Scripts
 
 | Script | Purpose |
 |--------|---------|
-| `ml_predict.py` | ML ensemble prediction (LightGBM + XGBoost) |
-| `ocifq_ml_selector.py` | OCIFQ + ML six-dimensional scoring |
-| `amadeus_emotion.py` | Sentiment temperature calculation |
-| `amadeus_pool_manager.py` | Observation pool management |
-| `amadeus_data.py` | Market data collection (multi-source) |
-| `amadeus_realtime.py` | Real-time quotes + technical indicators |
-| `amadeus_financials.py` | Financial statement analysis |
-| `amadeus_news_scanner.py` | News scanning (4 sources) |
-| `amadeus_sector_flow.py` | Sector capital flow |
-| `amadeus_external.py` | US/HK markets, forex, futures |
-| `amadeus_indicators.py` | Technical indicators (MA/MACD/RSI/Bollinger) |
-| `amadeus_screening.py` | Risk screening |
-| `amadeus_etf_pool_manager.py` | ETF pool management |
-| `amadeus_sim_integrate.py` | Simulation engine |
-| `data_source_manager.py` | Multi-source data manager with fallback |
-| `data_validator.py` | Data validation utilities |
-| `data_quality.py` | Data quality assessment |
-| `ml_simulation.py` | Simulated trading |
-| `ml_backtest.py` | Historical backtesting |
-| `train_models.py` | Model training pipeline |
-| `factor_miner.py` | Factor mining & validation |
-| `pantalone_tools_hub.py` | Unified signal generation hub |
-| `humanize_auto.py` | Chinese text anti-AI-detection |
-| `to_docx.py` | Markdown to DOCX conversion |
-| `qa_loop.py` | QA closed-loop testing |
+| `amadeus_sim_integrate.py` | Read and summarize optional simulation state |
+| `check_references_health.py` | Check references, routing and release-tree hygiene |
+| `md2docx.py` | Convert Markdown reports to DOCX |
+| `probe_external_capabilities.py` | Probe optional host capabilities with fail-closed fallbacks |
+| `tencent_quote_parser.py` | Parse Tencent quote responses |
+| `token_audit.py` | Audit active documentation size |
+
+Other scripts mentioned by the workflow are external Hermes host capabilities, not files shipped by this repository.
 
 ## OCIFQ Framework
 

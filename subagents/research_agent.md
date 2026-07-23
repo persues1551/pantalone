@@ -49,24 +49,16 @@ Pantalone Research Agent 是一个自动化投研系统，核心流程：
 
 ## 使用方式
 
-### 方式1：Hermes Agent 对话式
+Research Agent不是独立CLI程序，由Hermes会话按需编排。用户提出深度研究任务后，父Agent按照`workflow_v4_unified.md`拆分假设、证据、分析、评审和决策阶段，并通过`delegate_task`调用相应角色。
+
+对话式触发示例：
+
 ```
 主人: 研究一下半导体板块的投资机会
-Agent: [自动创建研究会话 → 生成假设 → 收集证据 → 评审 → 输出报告]
+Agent: [按8阶段工作流采集证据、并行研究、独立评审并输出报告]
 ```
 
-### 方式2：Cron自动执行
-```bash
-# 每周五收盘后自动研究一个热门话题
-0 15 * * 5 python3 amadeus_research.py --topic "本周热门板块" --depth 2
-```
-
-### 方式3：CLI手动触发
-```bash
-python3 amadeus_research.py --topic "英伟达财报对A股影响" --depth 3
-python3 amadeus_research.py --list-sessions
-python3 amadeus_research.py --report <session_id>
-```
+需要定期运行时，由父Agent使用Hermes的`cronjob`能力创建自包含任务；本文件不声明或依赖仓库内的本地研究引擎。定时任务仍须遵守数据时效、只读边界和独立Review门槛。
 
 ## 评审流程详解
 
@@ -86,21 +78,14 @@ python3 amadeus_research.py --report <session_id>
 3. 给出最终决策：Accept / Revise / Reject
 4. 如Revise，列出具体改进要求
 
-## 文件结构
+## 执行契约
 
-```
-amadeus/
-├── amadeus_research.py          # 核心引擎
-├── subagents/
-│   └── research_agent.md        # 本文件（说明文档）
-├── research_templates/          # 研究模板
-│   ├── sector_analysis.md       # 板块分析模板
-│   ├── earnings_analysis.md     # 财报分析模板
-│   └── macro_analysis.md        # 宏观分析模板
-└── $HERMES_HOME/cache/amadeus/research/
-    ├── session_<id>.json        # 研究会话数据
-    └── report_<id>.md           # 生成的报告
-```
+- 主流程：`workflow_v4_unified.md`
+- 路由与角色：`router.md`和`subagents/*.md`
+- 可选结构化输出：`subagents/schemas.py`
+- 报告模板：`templates/`
+- 外部能力：先按`references/external-capabilities.yaml`检查，缺失时显式降级
+- 会话与报告持久化：由Hermes运行时管理，本仓库不自行创建私有会话数据库
 
 ## 与现有Pantalone组件的集成
 
