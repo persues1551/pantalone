@@ -21,7 +21,7 @@
 - **4层框架美股适配**：增加美股版 Layer 1-4 映射表
 - **桥接引用**：明确「美股深度研究 → 加载 amadeus-us-market」
 
-### 3. 新增美股 Subagent（2-3个）
+### 3. 新增三个美股 Subagent
 
 在原有专业角色外已增加：
 
@@ -64,9 +64,9 @@
 - 现有 Pantalone 4层框架核心逻辑不变，只加美股映射层
 - `.hermes/` 下的 scripts 无需新增（yfinance 可直接在 subagent 中调用）
 
-## 优先级
+## 实施记录
 
-| 序号 | 改造项 | 工作量 |
+| 序号 | 已完成改造项 | 原评估工作量 |
 |------|--------|--------|
 | P0 | Agent 定义 + SKILL.md When to Use 更新 | 小 |
 | P1 | `us_market_data.md` subagent | 中 |

@@ -765,7 +765,8 @@ def _finite_number(value: Any) -> bool:
 
 
 def _percentage_evidence(value: str) -> bool:
-    return _meaningful_text(value) and bool(re.search(r"[-+]?\d+(?:\.\d+)?\s*%", value))
+    match = re.search(r"[-+]?(\d+(?:\.\d+)?)\s*%", value)
+    return _meaningful_text(value) and match is not None and float(match.group(1)) > 0
 
 
 class IndexData(BaseModel):
@@ -898,7 +899,7 @@ class USMarketDataReport(BaseModel):
     tnx: dict[str, Any] = Field(default_factory=dict)
     sector_rotation: SectorRotation = Field(default_factory=SectorRotation)
     market_regime: str = Field(default="unknown", pattern="^(risk_on|risk_off|neutral|unknown)$")
-    position_advice: str = ""
+    position_advice: Literal["", "increase_risk", "neutral", "reduce_risk", "stay_flat"] = ""
     leveraged_signal: LeveragedETFSignal = Field(default_factory=LeveragedETFSignal)
     data_quality: DataQuality = DataQuality.D
     data_date: str = ""
@@ -966,9 +967,13 @@ class USMarketDataReport(BaseModel):
                 raise ValueError("risk_on requires VIX below 25 and broad index trend confirmation")
             if self.market_regime == "risk_off" and not (actual_vix >= 20 and above_50 <= 1 and above_200 <= 1):
                 raise ValueError("risk_off requires VIX at least 20 and broad index weakness")
-            action_terms = ("满仓", "买入", "建仓", "加仓", "卖出", "清仓", "all-in")
-            if any(term in self.position_advice.lower() for term in action_terms):
-                raise ValueError("position_advice must not contain direct trade instructions")
+            advice_by_regime = {
+                "risk_on": {"increase_risk", "neutral"},
+                "neutral": {"neutral", "stay_flat"},
+                "risk_off": {"reduce_risk", "stay_flat"},
+            }
+            if self.position_advice and self.position_advice not in advice_by_regime[self.market_regime]:
+                raise ValueError("position advice must match market regime")
             if self.leveraged_signal.direction != "avoid":
                 signal_vix = self.leveraged_signal.vix_value
                 if signal_vix is None or abs(signal_vix - actual_vix) > 0.01:
@@ -1070,11 +1075,12 @@ class USFinancialReport(BaseModel):
             for peer in self.peer_comparison
         )
         forbidden_evidence = ("fabricated", "placeholder", "lorem", "rumor", "gossip", "示例", "占位")
+        ocifq_values = list(self.ocifq.model_dump().values())
         ocifq_complete = all(
             _meaningful_text(value, min_length=20)
             and not any(term in value.lower() for term in forbidden_evidence)
-            for value in self.ocifq.model_dump().values()
-        )
+            for value in ocifq_values
+        ) and len({" ".join(value.lower().split()) for value in ocifq_values}) == 5
         sources_complete = len({category for source in self.data_sources if (category := _source_category(source))}) >= 2
         evidence_complete = all(
             (
@@ -1085,6 +1091,7 @@ class USFinancialReport(BaseModel):
                 balance_evidence,
                 peer_evidence,
                 ocifq_complete,
+                not self.errors,
             )
         )
         if not evidence_complete:
@@ -1134,6 +1141,7 @@ class USRiskReport(BaseModel):
                 result.status != "unknown" and _meaningful_text(result.detail, min_length=12)
                 for result in required_results
             )
+            and not self.errors
         )
         alert_text_valid = all(_meaningful_text(item, min_length=12) for item in self.critical_alerts)
         warning_text_valid = all(_meaningful_text(item, min_length=12) for item in self.warnings)
@@ -1141,12 +1149,6 @@ class USRiskReport(BaseModel):
             raise ValueError("critical alerts require meaningful evidence text")
         if self.warnings and not warning_text_valid:
             raise ValueError("warnings require meaningful evidence text")
-        if self.critical_alerts:
-            if not evidence_complete:
-                raise ValueError("critical alerts require complete risk evidence")
-            if self.overall_risk != "critical" or self.risk_score > 20:
-                raise ValueError("critical alerts require critical risk and score <= 20")
-            return self
         if not evidence_complete:
             if self.overall_risk != "unknown" or self.risk_score != 0 or self.data_quality != DataQuality.D:
                 raise ValueError("incomplete risk evidence requires unknown risk, score 0, and data quality D")
@@ -1154,6 +1156,12 @@ class USRiskReport(BaseModel):
                 raise ValueError("incomplete risk evidence cannot carry warnings")
             return self
         statuses = {result.status for result in required_results}
+        if self.critical_alerts:
+            if "fail" not in statuses:
+                raise ValueError("critical alerts require a failed risk check")
+            if self.overall_risk != "critical" or self.risk_score > 20 or self.data_quality == DataQuality.D:
+                raise ValueError("critical alerts require critical risk, score <= 20, and usable data quality")
+            return self
         if "fail" in statuses:
             if self.overall_risk not in {"high", "critical"} or self.risk_score > 40:
                 raise ValueError("failed risk checks require high or critical risk and score <= 40")

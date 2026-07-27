@@ -93,7 +93,7 @@ delegate_task(
     "neutral": ["XLC", "XLY", "XLP", "XLI", "XLB", "XLRE"]
   },
   "market_regime": "risk_on",
-  "position_advice": "正常建仓",
+  "position_advice": "increase_risk",
   "leveraged_signal": {
     "direction": "long",
     "inputs_complete": true,

@@ -591,7 +591,7 @@ def test_us_evidence_models_fail_closed_across_fields():
         key: {"status": "pass", "detail": "No material issue found in current filing"}
         for key in unknown_checks
     }
-    with pytest.raises(ValueError, match="critical alerts require complete"):
+    with pytest.raises(ValueError, match="incomplete risk evidence"):
         m.USRiskReport(
             ticker="NVDA", overall_risk="critical", risk_score=0,
             critical_alerts=["SEC fraud action requires immediate review"],
