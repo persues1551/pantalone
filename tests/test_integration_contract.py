@@ -527,6 +527,25 @@ def test_us_evidence_models_fail_closed_across_fields():
             data_quality="A",
         )
 
+    with pytest.raises(ValueError, match="incomplete financial evidence"):
+        m.USFinancialReport(
+            ticker="NVDA", financial_score=80,
+            valuation={"forward_pe": 30, "fcf_yield": 3},
+            growth={"revenue_yoy": "+20%", "eps_yoy": "+25%"},
+            profitability={"roe": 30, "gross_margin": 60},
+            balance_sheet={"cash_to_debt": 2, "current_ratio": 1.5},
+            peer_comparison=[{"ticker": "AMD", "forward_pe": 25}],
+            ocifq={key: "substantive evidence from current filings" for key in (
+                "oligopoly", "catalyst", "industry_moat", "financial_blast", "quarterly_continuity"
+            )},
+            data_sources=["SEC", "SEC EDGAR"], data_quality="A",
+        )
+
+    with pytest.raises(ValueError):
+        m.USFinancialReport(
+            ticker="NVDA", valuation={"forward_pe": float("nan"), "fcf_yield": 3}
+        )
+
     complete_financial = m.USFinancialReport(
         ticker="NVDA",
         financial_score=80,
@@ -572,6 +591,13 @@ def test_us_evidence_models_fail_closed_across_fields():
         key: {"status": "pass", "detail": "No material issue found in current filing"}
         for key in unknown_checks
     }
+    with pytest.raises(ValueError, match="critical alerts require complete"):
+        m.USRiskReport(
+            ticker="NVDA", overall_risk="critical", risk_score=0,
+            critical_alerts=["SEC fraud action requires immediate review"],
+            data_quality="D",
+        )
+
     with pytest.raises(ValueError, match="critical alerts"):
         m.USRiskReport(
             ticker="NVDA", overall_risk="low", risk_score=100,

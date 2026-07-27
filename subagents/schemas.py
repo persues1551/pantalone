@@ -741,14 +741,23 @@ def _meaningful_text(value: str, *, min_length: int = 4) -> bool:
     return len(normalized) >= min_length and normalized not in placeholders
 
 
-def _recognized_source(value: str) -> bool:
+def _source_category(value: str) -> Optional[str]:
     normalized = value.strip().lower()
-    allowed = {
-        "sec", "sec edgar", "yfinance", "financial modeling prep", "fmp",
-        "finra", "cftc", "fred", "nasdaq", "nyse", "company investor relations",
-        "company 10-k", "company 10-q", "company 8-k", "official company filing",
+    categories = {
+        "sec": "sec", "sec edgar": "sec",
+        "yfinance": "yfinance",
+        "financial modeling prep": "fmp", "fmp": "fmp",
+        "finra": "finra", "cftc": "cftc", "fred": "fred",
+        "nasdaq": "exchange", "nyse": "exchange",
+        "company investor relations": "company",
+        "company 10-k": "company", "company 10-q": "company",
+        "company 8-k": "company", "official company filing": "company",
     }
-    return normalized in allowed
+    return categories.get(normalized)
+
+
+def _recognized_source(value: str) -> bool:
+    return _source_category(value) is not None
 
 
 def _finite_number(value: Any) -> bool:
@@ -973,11 +982,11 @@ class USMarketDataReport(BaseModel):
 
 class ValuationMetrics(BaseModel):
     """US stock valuation."""
-    forward_pe: Optional[float] = None
-    trailing_pe: Optional[float] = None
-    ev_ebitda: Optional[float] = None
-    peg: Optional[float] = None
-    fcf_yield: Optional[float] = None
+    forward_pe: Optional[float] = Field(default=None, allow_inf_nan=False)
+    trailing_pe: Optional[float] = Field(default=None, allow_inf_nan=False)
+    ev_ebitda: Optional[float] = Field(default=None, allow_inf_nan=False)
+    peg: Optional[float] = Field(default=None, allow_inf_nan=False)
+    fcf_yield: Optional[float] = Field(default=None, allow_inf_nan=False)
 
 
 class GrowthMetrics(BaseModel):
@@ -991,25 +1000,25 @@ class GrowthMetrics(BaseModel):
 
 class ProfitabilityMetrics(BaseModel):
     """Profitability ratios."""
-    roe: Optional[float] = None
-    gross_margin: Optional[float] = None
-    operating_margin: Optional[float] = None
-    net_margin: Optional[float] = None
+    roe: Optional[float] = Field(default=None, allow_inf_nan=False)
+    gross_margin: Optional[float] = Field(default=None, allow_inf_nan=False)
+    operating_margin: Optional[float] = Field(default=None, allow_inf_nan=False)
+    net_margin: Optional[float] = Field(default=None, allow_inf_nan=False)
 
 
 class BalanceSheetMetrics(BaseModel):
     """Key balance sheet strength indicators."""
-    debt_to_equity: Optional[float] = None
-    current_ratio: Optional[float] = None
-    cash_to_debt: Optional[float] = None
-    goodwill_to_assets: Optional[float] = None
+    debt_to_equity: Optional[float] = Field(default=None, allow_inf_nan=False)
+    current_ratio: Optional[float] = Field(default=None, allow_inf_nan=False)
+    cash_to_debt: Optional[float] = Field(default=None, allow_inf_nan=False)
+    goodwill_to_assets: Optional[float] = Field(default=None, allow_inf_nan=False)
 
 
 class PeerComparison(BaseModel):
     """Single peer comparison row."""
     ticker: str
-    forward_pe: Optional[float] = None
-    gross_margin: Optional[float] = None
+    forward_pe: Optional[float] = Field(default=None, allow_inf_nan=False)
+    gross_margin: Optional[float] = Field(default=None, allow_inf_nan=False)
     revenue_yoy: str = ""
 
 
@@ -1066,7 +1075,7 @@ class USFinancialReport(BaseModel):
             and not any(term in value.lower() for term in forbidden_evidence)
             for value in self.ocifq.model_dump().values()
         )
-        sources_complete = len({source.strip().lower() for source in self.data_sources if _recognized_source(source)}) >= 2
+        sources_complete = len({category for source in self.data_sources if (category := _source_category(source))}) >= 2
         evidence_complete = all(
             (
                 sources_complete,
@@ -1120,7 +1129,7 @@ class USRiskReport(BaseModel):
         required_results = [self.checks[key] for key in required_checks if key in self.checks]
         evidence_complete = (
             len(required_results) == len(required_checks)
-            and len({source.strip().lower() for source in self.data_sources if _recognized_source(source)}) >= 2
+            and len({category for source in self.data_sources if (category := _source_category(source))}) >= 2
             and all(
                 result.status != "unknown" and _meaningful_text(result.detail, min_length=12)
                 for result in required_results
@@ -1133,6 +1142,8 @@ class USRiskReport(BaseModel):
         if self.warnings and not warning_text_valid:
             raise ValueError("warnings require meaningful evidence text")
         if self.critical_alerts:
+            if not evidence_complete:
+                raise ValueError("critical alerts require complete risk evidence")
             if self.overall_risk != "critical" or self.risk_score > 20:
                 raise ValueError("critical alerts require critical risk and score <= 20")
             return self
