@@ -464,6 +464,23 @@ def test_us_evidence_models_fail_closed_across_fields():
     assert empty_market.market_regime == "unknown"
     assert empty_market.data_quality.value == "D"
 
+    hollow_index = {
+        "price": 1,
+        "5d_return": 0,
+        "1m_return": 0,
+        "3m_return": 0,
+        "52w_high_drawdown": 0,
+        "above_50ma": False,
+        "above_200ma": False,
+        "volatility_60d": 0,
+    }
+    with pytest.raises(ValueError):
+        m.USMarketDataReport(
+            indices={key: hollow_index for key in ("^GSPC", "^IXIC", "^DJI", "^RUT")},
+            vix={"value": 0}, dxy={"value": 0}, tnx={"value": 0},
+            data_date="2026-07-27", market_regime="risk_on", data_quality="A",
+        )
+
     with pytest.raises(ValueError, match="incomplete financial evidence"):
         m.USFinancialReport(ticker="NVDA", financial_score=80, data_quality="A")
 
@@ -476,20 +493,36 @@ def test_us_evidence_models_fail_closed_across_fields():
             ticker="NVDA", financial_score=80, data_sources=["SEC EDGAR"], data_quality="A"
         )
 
+    with pytest.raises(ValueError, match="incomplete financial evidence"):
+        m.USFinancialReport(
+            ticker="NVDA",
+            financial_score=100,
+            valuation={"forward_pe": 1},
+            growth={"revenue_yoy": "verified"},
+            profitability={"roe": 1},
+            balance_sheet={"cash_to_debt": 1},
+            peer_comparison=[{"ticker": "PEER"}],
+            ocifq={key: "verified" for key in (
+                "oligopoly", "catalyst", "industry_moat", "financial_blast", "quarterly_continuity"
+            )},
+            data_sources=["source"],
+            data_quality="A",
+        )
+
     complete_financial = m.USFinancialReport(
         ticker="NVDA",
         financial_score=80,
-        valuation={"forward_pe": 30},
-        growth={"revenue_yoy": "+20%"},
-        profitability={"roe": 30},
-        balance_sheet={"cash_to_debt": 2},
-        peer_comparison=[{"ticker": "AMD"}],
+        valuation={"forward_pe": 30, "fcf_yield": 3.5},
+        growth={"revenue_yoy": "revenue grew 20%", "eps_yoy": "EPS grew 25%"},
+        profitability={"roe": 30, "gross_margin": 65},
+        balance_sheet={"cash_to_debt": 2, "current_ratio": 1.8},
+        peer_comparison=[{"ticker": "AMD", "forward_pe": 25}],
         ocifq={
-            "oligopoly": "verified",
-            "catalyst": "verified",
-            "industry_moat": "verified",
-            "financial_blast": "verified",
-            "quarterly_continuity": "verified",
+            "oligopoly": "market share evidence verified",
+            "catalyst": "multi-year demand catalyst verified",
+            "industry_moat": "margin advantage versus peers verified",
+            "financial_blast": "revenue EPS and FCF growth verified",
+            "quarterly_continuity": "four consecutive quarters verified",
         },
         data_sources=["SEC EDGAR", "yfinance"],
         data_quality="A",
@@ -518,14 +551,14 @@ def test_us_evidence_models_fail_closed_across_fields():
         )
 
     pass_checks = {
-        key: {"status": "pass", "detail": "verified"}
+        key: {"status": "pass", "detail": "No material issue found in current filing"}
         for key in unknown_checks
     }
     with pytest.raises(ValueError, match="critical alerts"):
         m.USRiskReport(
             ticker="NVDA", overall_risk="low", risk_score=100,
             checks=pass_checks, critical_alerts=["SEC fraud action"],
-            data_sources=["SEC EDGAR"], data_quality="A"
+            data_sources=["SEC EDGAR", "yfinance"], data_quality="A"
         )
 
     fail_checks = dict(pass_checks)
@@ -533,7 +566,7 @@ def test_us_evidence_models_fail_closed_across_fields():
     with pytest.raises(ValueError, match="failed risk checks"):
         m.USRiskReport(
             ticker="NVDA", overall_risk="low", risk_score=90,
-            checks=fail_checks, data_sources=["SEC EDGAR"], data_quality="A"
+            checks=fail_checks, data_sources=["SEC EDGAR", "yfinance"], data_quality="A"
         )
 
     risk_a = m.USRiskReport(ticker="AAA")

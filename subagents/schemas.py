@@ -7,7 +7,9 @@ schemas alone does not wire structured output into the runtime.
 
 from __future__ import annotations
 
+from datetime import date
 from enum import Enum
+import math
 from typing import Any, Dict, List, Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -732,19 +734,39 @@ def render_etf_review_result(result: ETFReviewResult) -> str:
 # ============================================================================
 
 
+def _meaningful_text(value: str, *, min_length: int = 4) -> bool:
+    normalized = " ".join(value.strip().lower().split())
+    placeholders = {"", "-", "--", "n/a", "na", "none", "null", "unknown", "tbd", "test", "verified", "source"}
+    return len(normalized) >= min_length and normalized not in placeholders
+
+
+def _recognized_source(value: str) -> bool:
+    normalized = value.strip().lower()
+    markers = (
+        "sec", "edgar", "yfinance", "financial modeling prep", "fmp",
+        "finra", "cftc", "fred", "nasdaq", "nyse", "investor relations",
+        "company filing", "official", "http://", "https://",
+    )
+    return _meaningful_text(value, min_length=3) and any(marker in normalized for marker in markers)
+
+
+def _finite_number(value: Any) -> bool:
+    return isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value)
+
+
 class IndexData(BaseModel):
     """Single index data point."""
 
     model_config = ConfigDict(populate_by_name=True, serialize_by_alias=True)
 
-    price: float
-    five_day_return: float = Field(alias="5d_return")
-    one_month_return: float = Field(alias="1m_return")
-    three_month_return: float = Field(alias="3m_return")
-    fifty_two_week_high_drawdown: float = Field(alias="52w_high_drawdown")
+    price: float = Field(gt=0, allow_inf_nan=False)
+    five_day_return: float = Field(alias="5d_return", allow_inf_nan=False)
+    one_month_return: float = Field(alias="1m_return", allow_inf_nan=False)
+    three_month_return: float = Field(alias="3m_return", allow_inf_nan=False)
+    fifty_two_week_high_drawdown: float = Field(alias="52w_high_drawdown", ge=-100, le=0, allow_inf_nan=False)
     above_50ma: bool
     above_200ma: bool
-    volatility_60d: float
+    volatility_60d: float = Field(gt=0, allow_inf_nan=False)
 
 
 class SectorRotation(BaseModel):
@@ -871,12 +893,28 @@ class USMarketDataReport(BaseModel):
     @model_validator(mode="after")
     def enforce_market_evidence(self) -> "USMarketDataReport":
         required_indices = {"^GSPC", "^IXIC", "^DJI", "^RUT"}
+        try:
+            date.fromisoformat(self.data_date)
+            valid_date = True
+        except ValueError:
+            valid_date = False
+
+        def positive_payload(payload: dict[str, Any]) -> bool:
+            value = payload.get("value")
+            return (
+                isinstance(value, (int, float))
+                and not isinstance(value, bool)
+                and math.isfinite(value)
+                and value > 0
+            )
+
         evidence_complete = (
             required_indices.issubset(self.indices)
-            and bool(self.vix)
-            and bool(self.dxy)
-            and bool(self.tnx)
-            and bool(self.data_date.strip())
+            and positive_payload(self.vix)
+            and positive_payload(self.dxy)
+            and positive_payload(self.tnx)
+            and valid_date
+            and not self.errors
         )
         carries_conclusion = (
             self.market_regime != "unknown"
@@ -965,22 +1003,28 @@ class USFinancialReport(BaseModel):
 
     @model_validator(mode="after")
     def enforce_financial_evidence(self) -> "USFinancialReport":
-        valuation_evidence = any(value is not None for value in self.valuation.model_dump().values())
-        growth_evidence = any(
-            bool(value.strip()) if isinstance(value, str) else value > 0
+        valuation_evidence = sum(_finite_number(value) for value in self.valuation.model_dump().values()) >= 2
+        growth_evidence = sum(
+            _meaningful_text(value) if isinstance(value, str) else _finite_number(value) and value > 0
             for value in self.growth.model_dump().values()
+        ) >= 2
+        profitability_evidence = sum(_finite_number(value) for value in self.profitability.model_dump().values()) >= 2
+        balance_evidence = sum(_finite_number(value) for value in self.balance_sheet.model_dump().values()) >= 2
+        peer_evidence = any(
+            _meaningful_text(peer.ticker, min_length=1)
+            and any(_finite_number(value) for key, value in peer.model_dump().items() if key != "ticker")
+            for peer in self.peer_comparison
         )
-        profitability_evidence = any(value is not None for value in self.profitability.model_dump().values())
-        balance_evidence = any(value is not None for value in self.balance_sheet.model_dump().values())
-        ocifq_complete = all(bool(value.strip()) for value in self.ocifq.model_dump().values())
+        ocifq_complete = all(_meaningful_text(value, min_length=8) for value in self.ocifq.model_dump().values())
+        sources_complete = len({source.strip().lower() for source in self.data_sources if _recognized_source(source)}) >= 2
         evidence_complete = all(
             (
-                self.data_sources,
+                sources_complete,
                 valuation_evidence,
                 growth_evidence,
                 profitability_evidence,
                 balance_evidence,
-                self.peer_comparison,
+                peer_evidence,
                 ocifq_complete,
             )
         )
@@ -1026,8 +1070,11 @@ class USRiskReport(BaseModel):
         required_results = [self.checks[key] for key in required_checks if key in self.checks]
         evidence_complete = (
             len(required_results) == len(required_checks)
-            and bool(self.data_sources)
-            and all(result.status != "unknown" and bool(result.detail.strip()) for result in required_results)
+            and len({source.strip().lower() for source in self.data_sources if _recognized_source(source)}) >= 2
+            and all(
+                result.status != "unknown" and _meaningful_text(result.detail, min_length=12)
+                for result in required_results
+            )
         )
         if not evidence_complete:
             if self.overall_risk != "unknown" or self.risk_score != 0 or self.data_quality != DataQuality.D:
