@@ -752,48 +752,48 @@ class SectorRotation(BaseModel):
     neutral: list[str] = Field(default_factory=list)
 
 
+LEVERAGED_ETF_CONTRACTS = {
+    # ticker: (direction, target leverage, exact stop loss %, max hold days)
+    "TQQQ": ("long", 3.0, -5.0, 5),
+    "UPRO": ("long", 3.0, -5.0, 5),
+    "SPXL": ("long", 3.0, -5.0, 5),
+    "SOXL": ("long", 3.0, -5.0, 5),
+    "TECL": ("long", 3.0, -5.0, 5),
+    "UDOW": ("long", 3.0, -5.0, 5),
+    "SQQQ": ("inverse", 3.0, -5.0, 3),
+    "SPXU": ("inverse", 3.0, -5.0, 3),
+    "SOXS": ("inverse", 3.0, -5.0, 3),
+    "TECS": ("inverse", 3.0, -5.0, 3),
+    "SDOW": ("inverse", 3.0, -5.0, 3),
+    "QLD": ("long", 2.0, -4.0, 8),
+    "SSO": ("long", 2.0, -4.0, 8),
+    "QID": ("inverse", 2.0, -4.0, 8),
+    "SDS": ("inverse", 2.0, -4.0, 8),
+}
+
+
 class LeveragedETFPosition(BaseModel):
     """A bounded leveraged/inverse ETF tactical position."""
 
     ticker: str
     leverage: float = Field(gt=0, le=3)
-    position_pct: float = Field(ge=0, le=12)
+    position_pct: float = Field(gt=0, le=12)
     stop_loss: float = Field(lt=0, ge=-8)
     max_hold_days: int = Field(gt=0, le=8)
 
     @model_validator(mode="after")
     def enforce_product_contract(self) -> "LeveragedETFPosition":
-        expected_leverage = {
-            "TQQQ": 3.0,
-            "UPRO": 3.0,
-            "SPXL": 3.0,
-            "SOXL": 3.0,
-            "TECL": 3.0,
-            "UDOW": 3.0,
-            "SQQQ": 3.0,
-            "SPXU": 3.0,
-            "SOXS": 3.0,
-            "TECS": 3.0,
-            "SDOW": 3.0,
-            "QLD": 2.0,
-            "SSO": 2.0,
-            "QID": 2.0,
-            "SDS": 2.0,
-        }
         ticker = self.ticker.upper()
-        expected = expected_leverage.get(ticker)
-        if expected is None:
+        contract = LEVERAGED_ETF_CONTRACTS.get(ticker)
+        if contract is None:
             raise ValueError("unsupported leveraged ETF ticker")
-        if self.leverage != expected:
-            raise ValueError(f"{ticker} must use its {expected:g}x target leverage")
-        max_hold = 5 if expected == 3 else 8
+        _, expected_leverage, exact_stop_loss, max_hold = contract
+        if self.leverage != expected_leverage:
+            raise ValueError(f"{ticker} must use its {expected_leverage:g}x target leverage")
+        if self.stop_loss != exact_stop_loss:
+            raise ValueError(f"{ticker} stop_loss must equal {exact_stop_loss:g} percent")
         if self.max_hold_days > max_hold:
             raise ValueError(f"{ticker} max_hold_days must be <= {max_hold}")
-        if self.stop_loss > -3.0:
-            raise ValueError("stop_loss must cap loss by at least 3 percent")
-        maximum_loss = -5.0 if expected == 3 else -4.0
-        if self.stop_loss < maximum_loss:
-            raise ValueError(f"{ticker} stop_loss cannot be looser than {maximum_loss:g} percent")
         self.ticker = ticker
         return self
 
@@ -838,13 +838,11 @@ class LeveragedETFSignal(BaseModel):
                 raise ValueError("long leveraged signal requires VIX below 25")
             if self.direction == "inverse" and not 25 <= vix_value <= 30:
                 raise ValueError("inverse leveraged signal requires VIX between 25 and 30")
-        bull = {"TQQQ", "UPRO", "SPXL", "SOXL", "TECL", "UDOW", "QLD", "SSO"}
-        inverse = {"SQQQ", "SPXU", "SOXS", "TECS", "SDOW", "QID", "SDS"}
         tickers = {item.ticker for item in self.recommended}
-        if self.direction == "long" and tickers & inverse:
-            raise ValueError("long direction cannot recommend inverse products")
-        if self.direction == "inverse" and tickers & bull:
-            raise ValueError("inverse direction cannot recommend bull products")
+        if tickers:
+            expected_direction = {LEVERAGED_ETF_CONTRACTS[ticker][0] for ticker in tickers}
+            if expected_direction != {self.direction}:
+                raise ValueError("recommended products must match signal direction")
         exposure = sum(item.position_pct * item.leverage / 100 for item in self.recommended)
         if exposure > 0.5:
             raise ValueError("recommended leveraged notional exposure must be <= 0.5")

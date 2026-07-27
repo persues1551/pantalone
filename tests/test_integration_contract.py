@@ -284,7 +284,7 @@ def test_us_leveraged_signal_fails_closed_and_bounds_exposure():
             max_hold_days=2,
         )
 
-    with pytest.raises(ValueError, match="inverse products"):
+    with pytest.raises(ValueError, match="match signal direction"):
         m.LeveragedETFSignal(
             direction="long",
             inputs_complete=True,
@@ -342,6 +342,33 @@ def test_us_leveraged_signal_fails_closed_and_bounds_exposure():
                     "max_hold_days": 2,
                 }
             ],
+        )
+
+    with pytest.raises(ValueError, match="max_hold_days"):
+        m.LeveragedETFPosition(
+            ticker="SQQQ",
+            leverage=3,
+            position_pct=3,
+            stop_loss=-5,
+            max_hold_days=5,
+        )
+
+    with pytest.raises(ValueError, match="stop_loss must equal"):
+        m.LeveragedETFPosition(
+            ticker="TQQQ",
+            leverage=3,
+            position_pct=3,
+            stop_loss=-3,
+            max_hold_days=5,
+        )
+
+    with pytest.raises(ValueError, match="position_pct"):
+        m.LeveragedETFPosition(
+            ticker="TQQQ",
+            leverage=3,
+            position_pct=0,
+            stop_loss=-5,
+            max_hold_days=5,
         )
 
     with pytest.raises(ValueError, match="notional exposure"):
