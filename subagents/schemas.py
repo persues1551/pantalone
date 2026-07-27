@@ -7,10 +7,14 @@ schemas alone does not wire structured output into the runtime.
 
 from __future__ import annotations
 
+from datetime import date, timedelta
 from enum import Enum
-from typing import Dict, List, Literal, Optional
+import math
+import re
+from typing import Any, Dict, List, Literal, Optional
+from urllib.parse import urlparse
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 # ============================================================================
@@ -725,3 +729,557 @@ def render_etf_review_result(result: ETFReviewResult) -> str:
     if result.must_fix:
         lines.append(f"必须修正: {'; '.join(result.must_fix)}")
     return "\n".join(lines)
+
+
+# ============================================================================
+# US Market subagent models (v5.2)
+# ============================================================================
+
+
+def _meaningful_text(value: str, *, min_length: int = 4) -> bool:
+    normalized = " ".join(value.strip().lower().split())
+    placeholders = {"", "-", "--", "n/a", "na", "none", "null", "unknown", "tbd", "test", "verified", "source"}
+    return len(normalized) >= min_length and normalized not in placeholders
+
+
+def _source_category(value: str) -> Optional[str]:
+    normalized = value.strip().lower()
+    categories = {
+        "sec": "sec", "sec edgar": "sec",
+        "company 10-k": "sec", "company 10-q": "sec",
+        "company 8-k": "sec", "official company filing": "sec",
+        "yfinance": "yfinance",
+        "financial modeling prep": "fmp", "fmp": "fmp",
+        "finra": "finra", "cftc": "cftc", "fred": "fred",
+        "nasdaq": "exchange", "nyse": "exchange",
+        "company investor relations": "company",
+    }
+    return categories.get(normalized)
+
+
+def _recognized_source(value: str) -> bool:
+    return _source_category(value) is not None
+
+
+def _finite_number(value: Any) -> bool:
+    return isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value)
+
+
+def _percentage_evidence(value: str) -> bool:
+    match = re.search(r"[-+]?(\d+(?:\.\d+)?)\s*%", value)
+    return _meaningful_text(value) and match is not None and float(match.group(1)) > 0
+
+
+class IndexData(BaseModel):
+    """Single index data point."""
+
+    model_config = ConfigDict(populate_by_name=True, serialize_by_alias=True)
+
+    price: float = Field(gt=0, allow_inf_nan=False)
+    five_day_return: float = Field(alias="5d_return", allow_inf_nan=False)
+    one_month_return: float = Field(alias="1m_return", allow_inf_nan=False)
+    three_month_return: float = Field(alias="3m_return", allow_inf_nan=False)
+    fifty_two_week_high_drawdown: float = Field(alias="52w_high_drawdown", ge=-100, le=0, allow_inf_nan=False)
+    above_50ma: bool
+    above_200ma: bool
+    volatility_60d: float = Field(gt=0, allow_inf_nan=False)
+
+
+class SectorRotation(BaseModel):
+    """Sector rotation classification."""
+    trending_high: list[str] = Field(default_factory=list)
+    pullback_opportunity: list[str] = Field(default_factory=list)
+    weakening: list[str] = Field(default_factory=list)
+    neutral: list[str] = Field(default_factory=list)
+
+
+LEVERAGED_ETF_CONTRACTS = {
+    # ticker: (direction, target leverage, exact stop loss %, max hold days)
+    "TQQQ": ("long", 3.0, -5.0, 5),
+    "UPRO": ("long", 3.0, -5.0, 5),
+    "SPXL": ("long", 3.0, -5.0, 5),
+    "SOXL": ("long", 3.0, -5.0, 5),
+    "TECL": ("long", 3.0, -5.0, 5),
+    "UDOW": ("long", 3.0, -5.0, 5),
+    "SQQQ": ("inverse", 3.0, -5.0, 3),
+    "SPXU": ("inverse", 3.0, -5.0, 3),
+    "SOXS": ("inverse", 3.0, -5.0, 3),
+    "TECS": ("inverse", 3.0, -5.0, 3),
+    "SDOW": ("inverse", 3.0, -5.0, 3),
+    "QLD": ("long", 2.0, -4.0, 8),
+    "SSO": ("long", 2.0, -4.0, 8),
+    "QID": ("inverse", 2.0, -4.0, 8),
+    "SDS": ("inverse", 2.0, -4.0, 8),
+}
+
+LEVERAGED_ETF_UNDERLYINGS = {
+    "TQQQ": "^NDX", "SQQQ": "^NDX", "QLD": "^NDX", "QID": "^NDX",
+    "UPRO": "^GSPC", "SPXL": "^GSPC", "SPXU": "^GSPC", "SSO": "^GSPC", "SDS": "^GSPC",
+    "SOXL": "NYSE_SEMICONDUCTOR", "SOXS": "NYSE_SEMICONDUCTOR",
+    "TECL": "TECHNOLOGY_SELECT_SECTOR", "TECS": "TECHNOLOGY_SELECT_SECTOR",
+    "UDOW": "^DJI", "SDOW": "^DJI",
+}
+
+
+class LeveragedETFPosition(BaseModel):
+    """A bounded leveraged/inverse ETF tactical position."""
+
+    ticker: str
+    leverage: float = Field(gt=0, le=3)
+    position_pct: float = Field(gt=0, le=12)
+    stop_loss: float = Field(lt=0, ge=-8)
+    max_hold_days: int = Field(gt=0, le=8)
+
+    @model_validator(mode="after")
+    def enforce_product_contract(self) -> "LeveragedETFPosition":
+        ticker = self.ticker.upper()
+        contract = LEVERAGED_ETF_CONTRACTS.get(ticker)
+        if contract is None:
+            raise ValueError("unsupported leveraged ETF ticker")
+        _, expected_leverage, exact_stop_loss, max_hold = contract
+        if self.leverage != expected_leverage:
+            raise ValueError(f"{ticker} must use its {expected_leverage:g}x target leverage")
+        if self.stop_loss != exact_stop_loss:
+            raise ValueError(f"{ticker} stop_loss must equal {exact_stop_loss:g} percent")
+        if self.max_hold_days > max_hold:
+            raise ValueError(f"{ticker} max_hold_days must be <= {max_hold}")
+        self.ticker = ticker
+        return self
+
+
+class LeveragedETFSignal(BaseModel):
+    """Tactical signal that must allow the fail-closed avoid outcome."""
+
+    direction: str = Field(default="avoid", pattern="^(long|inverse|avoid)$")
+    inputs_complete: bool = False
+    trend_confirmed: bool = False
+    momentum_confirmed: bool = False
+    breadth_confirmed: bool = False
+    liquidity_confirmed: bool = False
+    volatility_confirmed: bool = False
+    vix_value: Optional[float] = Field(default=None, ge=0, allow_inf_nan=False)
+    underlying_index: str = ""
+    price_vs_20ma_pct: Optional[float] = Field(default=None, allow_inf_nan=False)
+    ma20_slope_pct: Optional[float] = Field(default=None, allow_inf_nan=False)
+    macd_histogram: Optional[float] = Field(default=None, allow_inf_nan=False)
+    breadth_decline_advance_ratio: Optional[float] = Field(default=None, ge=0, allow_inf_nan=False)
+    volume_to_20d_ratio: Optional[float] = Field(default=None, ge=0, allow_inf_nan=False)
+    vix_level: str = "unknown"
+    recommended: list[LeveragedETFPosition] = Field(default_factory=list)
+    not_recommended: list[str] = Field(default_factory=list)
+    rationale: str = ""
+
+    @model_validator(mode="after")
+    def enforce_avoid_and_exposure(self) -> "LeveragedETFSignal":
+        if self.direction == "avoid" and self.recommended:
+            raise ValueError("avoid direction cannot recommend leveraged positions")
+        if self.direction != "avoid" and not self.recommended:
+            raise ValueError("directional leveraged signal requires at least one supported product")
+        confirmations = (
+            self.inputs_complete,
+            self.trend_confirmed,
+            self.momentum_confirmed,
+            self.breadth_confirmed,
+            self.liquidity_confirmed,
+            self.volatility_confirmed,
+        )
+        if self.direction != "avoid" and not all(confirmations):
+            raise ValueError("directional leveraged signal requires complete confirmed inputs")
+        if self.direction == "avoid" and any(confirmations):
+            raise ValueError("avoid direction cannot carry confirmed inputs")
+        if self.direction != "avoid":
+            if self.vix_value is None:
+                raise ValueError("directional leveraged signal requires a current VIX value")
+            vix_value = self.vix_value
+            if vix_value > 30:
+                raise ValueError("VIX above 30 requires avoid direction")
+            if self.direction == "long" and vix_value >= 25:
+                raise ValueError("long leveraged signal requires VIX below 25")
+            if self.direction == "inverse" and not 25 <= vix_value <= 30:
+                raise ValueError("inverse products require VIX in the 25-30 confirmation band")
+            tickers = {item.ticker for item in self.recommended}
+            expected_direction = {LEVERAGED_ETF_CONTRACTS[ticker][0] for ticker in tickers}
+            if expected_direction != {self.direction}:
+                raise ValueError("recommended products must match signal direction")
+            exposure = sum(item.position_pct * item.leverage / 100 for item in self.recommended)
+            if exposure > 0.5:
+                raise ValueError("recommended leveraged notional exposure must be <= 0.5")
+            expected_underlyings = {LEVERAGED_ETF_UNDERLYINGS[ticker] for ticker in tickers}
+            if expected_underlyings != {self.underlying_index.strip().upper()}:
+                raise ValueError("underlying index must match every recommended product")
+            observations = (
+                self.underlying_index.strip(),
+                self.price_vs_20ma_pct,
+                self.ma20_slope_pct,
+                self.macd_histogram,
+                self.breadth_decline_advance_ratio,
+                self.volume_to_20d_ratio,
+            )
+            if not all(value is not None and value != "" for value in observations):
+                raise ValueError("directional leveraged signal requires numeric observations")
+            assert self.price_vs_20ma_pct is not None
+            assert self.ma20_slope_pct is not None
+            assert self.macd_histogram is not None
+            assert self.breadth_decline_advance_ratio is not None
+            assert self.volume_to_20d_ratio is not None
+            price_vs_20ma = self.price_vs_20ma_pct
+            ma20_slope = self.ma20_slope_pct
+            macd_histogram = self.macd_histogram
+            breadth_ratio = self.breadth_decline_advance_ratio
+            volume_ratio = self.volume_to_20d_ratio
+            if volume_ratio < 0.8:
+                raise ValueError("directional leveraged signal requires adequate volume")
+            if self.direction == "long" and not (
+                price_vs_20ma > 0 and ma20_slope > 0 and macd_histogram > 0
+            ):
+                raise ValueError("long signal observations do not confirm trend and momentum")
+            if self.direction == "inverse" and not (
+                price_vs_20ma < 0
+                and ma20_slope < 0
+                and macd_histogram < 0
+                and breadth_ratio > 2
+            ):
+                raise ValueError("inverse signal observations do not confirm trend, momentum, and breadth")
+        return self
+
+
+class USMarketDataReport(BaseModel):
+    """US market data collection result."""
+    indices: dict[str, IndexData]
+    vix: dict[str, Any] = Field(default_factory=dict)
+    dxy: dict[str, Any] = Field(default_factory=dict)
+    tnx: dict[str, Any] = Field(default_factory=dict)
+    sector_rotation: SectorRotation = Field(default_factory=SectorRotation)
+    market_regime: str = Field(default="unknown", pattern="^(risk_on|risk_off|neutral|unknown)$")
+    position_advice: Literal["", "increase_risk", "neutral", "reduce_risk", "stay_flat"] = ""
+    leveraged_signal: LeveragedETFSignal = Field(default_factory=LeveragedETFSignal)
+    data_quality: DataQuality = DataQuality.D
+    data_date: str = ""
+    errors: list[str] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def enforce_market_evidence(self) -> "USMarketDataReport":
+        required_indices = {"^GSPC", "^IXIC", "^DJI", "^RUT"}
+        parsed_date: Optional[date] = None
+        try:
+            parsed_date = date.fromisoformat(self.data_date)
+            valid_date = True
+        except ValueError:
+            valid_date = False
+
+        def positive_payload(payload: dict[str, Any]) -> bool:
+            value = payload.get("value")
+            return (
+                isinstance(value, (int, float))
+                and not isinstance(value, bool)
+                and math.isfinite(value)
+                and value > 0
+            )
+
+        evidence_complete = (
+            required_indices.issubset(self.indices)
+            and all(
+                any(
+                    abs(value) > 1e-9
+                    for value in (
+                        row.five_day_return,
+                        row.one_month_return,
+                        row.three_month_return,
+                        row.fifty_two_week_high_drawdown,
+                    )
+                )
+                for row in self.indices.values()
+            )
+            and any(self.sector_rotation.model_dump().values())
+            and positive_payload(self.vix)
+            and positive_payload(self.dxy)
+            and positive_payload(self.tnx)
+            and valid_date
+            and not self.errors
+        )
+        carries_conclusion = (
+            self.market_regime != "unknown"
+            or bool(self.position_advice.strip())
+            or self.leveraged_signal.direction != "avoid"
+            or self.data_quality != DataQuality.D
+        )
+        if parsed_date is not None and parsed_date > date.today() and carries_conclusion:
+            raise ValueError("market report cannot carry a conclusion with a future data date")
+        if not evidence_complete and carries_conclusion:
+            raise ValueError(
+                "incomplete market evidence requires unknown regime, empty advice, avoid signal, and data quality D"
+            )
+        if self.data_quality == DataQuality.D and (
+            self.market_regime != "unknown" or self.leveraged_signal.direction != "avoid"
+        ):
+            raise ValueError("data quality D cannot carry a directional market conclusion")
+        if evidence_complete:
+            if self.market_regime != "unknown" and parsed_date is not None and parsed_date < date.today() - timedelta(days=3):
+                raise ValueError("directional market conclusion requires data no older than 3 days")
+            actual_vix = float(self.vix["value"])
+            index_rows = [self.indices[key] for key in required_indices]
+            above_50 = sum(row.above_50ma for row in index_rows)
+            above_200 = sum(row.above_200ma for row in index_rows)
+            required_advice_by_regime = {
+                "risk_on": {"increase_risk", "neutral"},
+                "neutral": {"neutral", "stay_flat"},
+                "risk_off": {"reduce_risk", "stay_flat"},
+            }
+            if not self.position_advice:
+                if self.market_regime == "risk_on" and actual_vix < 25 and above_50 >= 3 and above_200 >= 3:
+                    raise ValueError("risk_on with full evidence requires explicit position advice")
+                if self.market_regime == "risk_off" and actual_vix >= 20 and above_50 <= 1 and above_200 <= 1:
+                    raise ValueError("risk_off with full evidence requires explicit position advice")
+            if self.market_regime == "risk_on" and not (actual_vix < 25 and above_50 >= 3 and above_200 >= 3):
+                raise ValueError("risk_on requires VIX below 25 and broad index trend confirmation")
+            if self.market_regime == "risk_off" and not (actual_vix >= 20 and above_50 <= 1 and above_200 <= 1):
+                raise ValueError("risk_off requires VIX at least 20 and broad index weakness")
+            advice_by_regime = {
+                "risk_on": {"increase_risk", "neutral"},
+                "neutral": {"neutral", "stay_flat"},
+                "risk_off": {"reduce_risk", "stay_flat"},
+            }
+            if self.position_advice and self.position_advice not in advice_by_regime[self.market_regime]:
+                raise ValueError("position advice must match market regime")
+            if self.leveraged_signal.direction != "avoid":
+                signal_vix = self.leveraged_signal.vix_value
+                if signal_vix is None or abs(signal_vix - actual_vix) > 0.01:
+                    raise ValueError("leveraged signal VIX must match market VIX")
+                if self.leveraged_signal.direction == "long" and self.market_regime != "risk_on":
+                    raise ValueError("long leveraged signal requires risk_on market regime")
+                if self.leveraged_signal.direction == "inverse" and self.market_regime != "risk_off":
+                    raise ValueError("inverse leveraged signal requires risk_off market regime")
+        return self
+
+
+class ValuationMetrics(BaseModel):
+    """US stock valuation."""
+    forward_pe: Optional[float] = Field(default=None, allow_inf_nan=False)
+    trailing_pe: Optional[float] = Field(default=None, allow_inf_nan=False)
+    ev_ebitda: Optional[float] = Field(default=None, allow_inf_nan=False)
+    peg: Optional[float] = Field(default=None, allow_inf_nan=False)
+    fcf_yield: Optional[float] = Field(default=None, allow_inf_nan=False)
+
+
+class GrowthMetrics(BaseModel):
+    """Revenue/earnings/FCF growth and beat streak."""
+    revenue_yoy: str = ""
+    eps_yoy: str = ""
+    fcf_yoy: str = ""
+    revenue_beat_streak: int = 0
+    eps_beat_streak: int = 0
+
+
+class ProfitabilityMetrics(BaseModel):
+    """Profitability ratios."""
+    roe: Optional[float] = Field(default=None, allow_inf_nan=False)
+    gross_margin: Optional[float] = Field(default=None, allow_inf_nan=False)
+    operating_margin: Optional[float] = Field(default=None, allow_inf_nan=False)
+    net_margin: Optional[float] = Field(default=None, allow_inf_nan=False)
+
+
+class BalanceSheetMetrics(BaseModel):
+    """Key balance sheet strength indicators."""
+    debt_to_equity: Optional[float] = Field(default=None, allow_inf_nan=False)
+    current_ratio: Optional[float] = Field(default=None, allow_inf_nan=False)
+    cash_to_debt: Optional[float] = Field(default=None, allow_inf_nan=False)
+    goodwill_to_assets: Optional[float] = Field(default=None, allow_inf_nan=False)
+
+
+class PeerComparison(BaseModel):
+    """Single peer comparison row."""
+    ticker: str
+    forward_pe: Optional[float] = Field(default=None, allow_inf_nan=False)
+    gross_margin: Optional[float] = Field(default=None, allow_inf_nan=False)
+    revenue_yoy: str = ""
+
+
+class OCIQFResult(BaseModel):
+    """OCIFQ five-dimension result for US stocks."""
+    oligopoly: str = ""
+    catalyst: str = ""
+    industry_moat: str = ""
+    financial_blast: str = ""
+    quarterly_continuity: str = ""
+
+
+class USFinancialReport(BaseModel):
+    """US stock financial analysis report."""
+    ticker: str
+    company_name: str = ""
+    currency: str = "USD"
+    financial_score: int = Field(default=0, ge=0, le=100)
+    valuation: ValuationMetrics = Field(default_factory=ValuationMetrics)
+    growth: GrowthMetrics = Field(default_factory=GrowthMetrics)
+    profitability: ProfitabilityMetrics = Field(default_factory=ProfitabilityMetrics)
+    balance_sheet: BalanceSheetMetrics = Field(default_factory=BalanceSheetMetrics)
+    peer_comparison: list[PeerComparison] = Field(default_factory=list)
+    ocifq: OCIQFResult = Field(default_factory=OCIQFResult)
+    accounting_notes: str = ""
+    data_sources: list[str] = Field(default_factory=list)
+    evidence_refs: dict[str, str] = Field(default_factory=dict)
+    data_quality: DataQuality = DataQuality.D
+    errors: list[str] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def enforce_financial_evidence(self) -> "USFinancialReport":
+        required_refs = {
+            "valuation", "growth", "profitability", "balance_sheet", "peers",
+            "oligopoly", "catalyst", "industry_moat", "financial_blast", "quarterly_continuity",
+        }
+        trusted_hosts = {
+            "sec.gov", "www.sec.gov", "data.sec.gov", "finance.yahoo.com",
+            "financialmodelingprep.com", "site.financialmodelingprep.com",
+        }
+        refs_complete = required_refs.issubset(self.evidence_refs) and all(
+            urlparse(self.evidence_refs[key]).scheme == "https"
+            and urlparse(self.evidence_refs[key]).hostname in trusted_hosts
+            and urlparse(self.evidence_refs[key]).path not in {"", "/"}
+            for key in required_refs
+        ) and len({
+            urlparse(self.evidence_refs[key])._replace(fragment="").geturl()
+            for key in required_refs
+        }) >= 5 and len(
+            {urlparse(self.evidence_refs[key]).hostname for key in required_refs}
+        ) >= 2
+        valuation_evidence = sum(_finite_number(value) and abs(value) > 1e-12 for value in self.valuation.model_dump().values()) >= 2
+        growth_evidence = sum(
+            _percentage_evidence(value) if isinstance(value, str) else _finite_number(value) and value > 0
+            for value in self.growth.model_dump().values()
+        ) >= 2
+        profitability_evidence = sum(
+            _finite_number(value) and abs(value) > 1e-12 for value in self.profitability.model_dump().values()
+        ) >= 2
+        balance_evidence = sum(
+            _finite_number(value) and abs(value) > 1e-12 for value in self.balance_sheet.model_dump().values()
+        ) >= 2
+        peer_evidence = any(
+            _meaningful_text(peer.ticker, min_length=1)
+            and any(
+                _finite_number(value) and abs(value) > 1e-12
+                for key, value in peer.model_dump().items() if key != "ticker"
+            )
+            for peer in self.peer_comparison
+        )
+        forbidden_evidence = ("fabricated", "placeholder", "lorem", "rumor", "gossip", "示例", "占位")
+        ocifq_values = list(self.ocifq.model_dump().values())
+        ocifq_complete = all(
+            _meaningful_text(value, min_length=20)
+            and not any(term in value.lower() for term in forbidden_evidence)
+            for value in ocifq_values
+        ) and len({" ".join(value.lower().split()) for value in ocifq_values}) == 5
+        sources_complete = len({category for source in self.data_sources if (category := _source_category(source))}) >= 2
+        evidence_complete = all(
+            (
+                sources_complete,
+                valuation_evidence,
+                growth_evidence,
+                profitability_evidence,
+                balance_evidence,
+                peer_evidence,
+                ocifq_complete,
+                refs_complete,
+                not self.errors,
+            )
+        )
+        if not evidence_complete:
+            if self.financial_score != 0 or self.data_quality != DataQuality.D:
+                raise ValueError("incomplete financial evidence requires score 0 and data quality D")
+        elif self.data_quality == DataQuality.D and self.financial_score > 0:
+            raise ValueError("data quality D cannot carry a positive financial score")
+        return self
+
+
+class RiskCheckResult(BaseModel):
+    """Single risk check result."""
+    status: str = Field(pattern="^(pass|warn|fail|unknown)$")
+    detail: str = ""
+
+
+class USRiskReport(BaseModel):
+    """US stock risk screening report."""
+    ticker: str
+    overall_risk: str = Field(default="unknown", pattern="^(low|medium|high|critical|unknown)$")
+    risk_score: int = Field(default=0, ge=0, le=100)  # higher = safer
+    checks: dict[str, RiskCheckResult] = Field(default_factory=dict)
+    critical_alerts: list[str] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=list)
+    risk_bias: str = ""
+    data_sources: list[str] = Field(default_factory=list)
+    data_quality: DataQuality = DataQuality.D
+    errors: list[str] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def enforce_risk_evidence(self) -> "USRiskReport":
+        required_checks = {
+            "delisting",
+            "litigation",
+            "insider_selling",
+            "goodwill",
+            "debt",
+            "customer_concentration",
+            "regulatory",
+            "accounting",
+        }
+        required_results = [self.checks[key] for key in required_checks if key in self.checks]
+        evidence_complete = (
+            len(required_results) == len(required_checks)
+            and len({category for source in self.data_sources if (category := _source_category(source))}) >= 2
+            and all(
+                result.status != "unknown" and _meaningful_text(result.detail, min_length=12)
+                for result in required_results
+            )
+            and not self.errors
+        )
+        alert_text_valid = all(_meaningful_text(item, min_length=12) for item in self.critical_alerts)
+        warning_text_valid = all(_meaningful_text(item, min_length=12) for item in self.warnings)
+        if self.critical_alerts and not alert_text_valid:
+            raise ValueError("critical alerts require meaningful evidence text")
+        if self.warnings and not warning_text_valid:
+            raise ValueError("warnings require meaningful evidence text")
+        if not evidence_complete:
+            if self.overall_risk != "unknown" or self.risk_score != 0 or self.data_quality != DataQuality.D:
+                raise ValueError("incomplete risk evidence requires unknown risk, score 0, and data quality D")
+            if self.warnings:
+                raise ValueError("incomplete risk evidence cannot carry warnings")
+            if self.critical_alerts:
+                raise ValueError("incomplete risk evidence cannot carry critical alerts")
+            return self
+        statuses = {result.status for result in required_results}
+        if self.critical_alerts:
+            if not evidence_complete:
+                raise ValueError("critical alerts require complete risk evidence")
+            if "fail" not in statuses:
+                raise ValueError("critical alerts require a failed risk check")
+            if self.overall_risk != "critical" or self.risk_score > 20 or self.data_quality == DataQuality.D:
+                raise ValueError("critical alerts require critical risk, score <= 20, and usable data quality")
+            return self
+        if "fail" in statuses:
+            if self.overall_risk not in {"high", "critical"} or self.risk_score > 40:
+                raise ValueError("failed risk checks require high or critical risk and score <= 40")
+        elif "warn" in statuses:
+            if self.overall_risk == "low" or self.risk_score > 75:
+                raise ValueError("warning risk checks cannot produce low risk or score > 75")
+        elif not self.warnings and (self.overall_risk != "low" or self.risk_score < 76):
+            raise ValueError("all-pass risk checks without warnings require low risk and score >= 76")
+        if self.warnings and (self.overall_risk == "low" or self.risk_score > 75):
+            raise ValueError("warnings cannot produce low risk or score > 75")
+        if "warn" in statuses and not self.warnings:
+            raise ValueError("warn risk checks require non-empty warnings")
+        if self.warnings and "warn" not in statuses:
+            raise ValueError("warnings require at least one warn risk check")
+        if "fail" in statuses and self.overall_risk == "critical" and not self.critical_alerts:
+            raise ValueError("critical overall risk with failed checks requires critical alerts")
+        score_ranges = {
+            "critical": (0, 20),
+            "high": (0, 40),
+            "medium": (41, 75),
+            "low": (76, 100),
+        }
+        if self.overall_risk in score_ranges:
+            lower, upper = score_ranges[self.overall_risk]
+            if not lower <= self.risk_score <= upper:
+                raise ValueError("risk score must match overall risk severity")
+        if self.data_quality == DataQuality.D and self.risk_score > 0:
+            raise ValueError("data quality D cannot carry a positive risk score")
+        return self

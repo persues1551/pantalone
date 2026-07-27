@@ -19,6 +19,7 @@ Pantalone是Amadeus三Agent架构中的投研分析Agent，负责市场、个股
 | 快速诊断 | 快速诊断、只看技术面、现价 | Stage 1/2/8的明确子集 |
 | 资金面 | 龙虎榜、融资融券、大宗交易、北向、主力资金 | `subagents/capital.md` |
 | 财务 | 财报、营收、利润、现金流、估值 | `subagents/financial.md` |
+| 美股财务 | 美股财报、10-K、10-Q、forward PE、FCF yield | `subagents/us_financial.md`；作为完整8阶段的财务子任务 |
 | 技术面 | 趋势、均线、量价、支撑压力 | `subagents/technical.md` |
 | 板块/题材 | 板块、概念、产业催化 | `subagents/theme.md` |
 | 宏观/多资产 | 利率、汇率、黄金、债券、商品 | `subagents/macro.md`、`rules/multi_asset_rules.md` |
@@ -26,6 +27,8 @@ Pantalone是Amadeus三Agent架构中的投研分析Agent，负责市场、个股
 | 观察池 | 入池、退池、池状态、止损、超时 | `rules/pool_rules.md` |
 | 预测复盘 | 昨日预测验证、复盘、独立挑错 | `subagents/review.md` |
 | 盘前/午盘/收盘 | 早报、午盘、收盘、晚间复盘 | `subagents/market_data.md`和对应模板 |
+| 美股市场/外围 | 标普、纳指、道指、VIX、美债、美元、行业轮动 | `subagents/us_market_data.md`；速览或完整8阶段的数据子任务 |
+| 美股专属风险 | delisting、class action、insider selling、SEC/监管 | `subagents/us_risk.md`；作为完整8阶段的风险子任务 |
 | 巨型IPO | IPO、抽血、利好出尽、比价效应 | `references/mega-ipo-impact-analysis.md` |
 
 用户没有明确说“快速”时，具体标的的“研究”执行完整8阶段，不自动降级成技术摘要。多只标的分别生成独立完整报告；对比汇总只能作为额外交付。
@@ -95,6 +98,9 @@ Stage 5风控、Stage 6合规和Stage 8最终决策分别保留，不用单个�
 | ETF | `subagents/etf.md` | ETF分类、资产、流动性、费率和组合角色 |
 | ETF Reviewer | `subagents/etf_reviewer.md` | ETF折溢价、跟踪误差、流动性和仓位审查 |
 | Risk | `subagents/risk.md` | 数据质量、排雷、权限和下行风险 |
+| US Market Data | `subagents/us_market_data.md` | 美股指数、VIX、美元、美债和行业轮动 |
+| US Financial | `subagents/us_financial.md` | 10-K/10-Q、估值、FCF、同行和OCIFQ财务证据 |
+| US Risk | `subagents/us_risk.md` | 退市、诉讼、内幕交易、会计和监管风险 |
 
 ### 通用辅助角色
 

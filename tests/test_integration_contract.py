@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import date
 import importlib.util
 import json
 import os
@@ -235,6 +236,574 @@ def test_core_schemas_instantiate_and_render():
         m.render_review_result(review),
     ]
     assert all(isinstance(output, str) and output.strip() for output in outputs)
+
+
+def test_us_leveraged_signal_fails_closed_and_bounds_exposure():
+    m = load_schemas()
+
+    default_signal = m.LeveragedETFSignal()
+    assert default_signal.direction == "avoid"
+    assert default_signal.recommended == []
+
+    with pytest.raises(ValueError, match="avoid direction"):
+        m.LeveragedETFSignal(
+            direction="avoid",
+            recommended=[
+                {
+                    "ticker": "TQQQ",
+                    "leverage": 3,
+                    "position_pct": 5,
+                    "stop_loss": -5,
+                    "max_hold_days": 5,
+                }
+            ],
+        )
+
+    with pytest.raises(ValueError, match="at least one supported product"):
+        m.LeveragedETFSignal(direction="long")
+
+    with pytest.raises(ValueError, match="complete confirmed inputs"):
+        m.LeveragedETFSignal(
+            direction="long",
+            recommended=[
+                {
+                    "ticker": "TQQQ",
+                    "leverage": 3,
+                    "position_pct": 3,
+                    "stop_loss": -5,
+                    "max_hold_days": 2,
+                }
+            ],
+        )
+
+    with pytest.raises(ValueError, match="unsupported leveraged ETF"):
+        m.LeveragedETFPosition(
+            ticker="FNGU",
+            leverage=3,
+            position_pct=2,
+            stop_loss=-5,
+            max_hold_days=2,
+        )
+
+    with pytest.raises(ValueError, match="match signal direction"):
+        m.LeveragedETFSignal(
+            direction="long",
+            inputs_complete=True,
+            trend_confirmed=True,
+            momentum_confirmed=True,
+            breadth_confirmed=True,
+            liquidity_confirmed=True,
+            volatility_confirmed=True,
+            vix_value=20,
+            recommended=[
+                {
+                    "ticker": "SQQQ",
+                    "leverage": 3,
+                    "position_pct": 3,
+                    "stop_loss": -5,
+                    "max_hold_days": 2,
+                }
+            ],
+        )
+
+    with pytest.raises(ValueError, match="unsupported leveraged ETF"):
+        m.LeveragedETFSignal(
+            direction="long",
+            inputs_complete=True,
+            trend_confirmed=True,
+            momentum_confirmed=True,
+            breadth_confirmed=True,
+            liquidity_confirmed=True,
+            volatility_confirmed=True,
+            vix_value=20,
+            recommended=[
+                {
+                    "ticker": "XYZ",
+                    "leverage": 3,
+                    "position_pct": 3,
+                    "stop_loss": -5,
+                    "max_hold_days": 2,
+                }
+            ],
+        )
+
+    with pytest.raises(ValueError, match="target leverage"):
+        m.LeveragedETFSignal(
+            direction="long",
+            inputs_complete=True,
+            trend_confirmed=True,
+            momentum_confirmed=True,
+            breadth_confirmed=True,
+            liquidity_confirmed=True,
+            volatility_confirmed=True,
+            vix_value=20,
+            recommended=[
+                {
+                    "ticker": "TQQQ",
+                    "leverage": 0.1,
+                    "position_pct": 3,
+                    "stop_loss": -5,
+                    "max_hold_days": 2,
+                }
+            ],
+        )
+
+    with pytest.raises(ValueError, match="max_hold_days"):
+        m.LeveragedETFPosition(
+            ticker="SQQQ",
+            leverage=3,
+            position_pct=3,
+            stop_loss=-5,
+            max_hold_days=5,
+        )
+
+    with pytest.raises(ValueError, match="stop_loss must equal"):
+        m.LeveragedETFPosition(
+            ticker="TQQQ",
+            leverage=3,
+            position_pct=3,
+            stop_loss=-3,
+            max_hold_days=5,
+        )
+
+    with pytest.raises(ValueError, match="position_pct"):
+        m.LeveragedETFPosition(
+            ticker="TQQQ",
+            leverage=3,
+            position_pct=0,
+            stop_loss=-5,
+            max_hold_days=5,
+        )
+
+    with pytest.raises(ValueError, match="notional exposure"):
+        m.LeveragedETFSignal(
+            direction="long",
+            inputs_complete=True,
+            trend_confirmed=True,
+            momentum_confirmed=True,
+            breadth_confirmed=True,
+            liquidity_confirmed=True,
+            volatility_confirmed=True,
+            vix_value=20,
+            recommended=[
+                {
+                    "ticker": "TQQQ",
+                    "leverage": 3,
+                    "position_pct": 12,
+                    "stop_loss": -5,
+                    "max_hold_days": 5,
+                },
+                {
+                    "ticker": "SOXL",
+                    "leverage": 3,
+                    "position_pct": 8,
+                    "stop_loss": -5,
+                    "max_hold_days": 4,
+                },
+            ],
+        )
+
+    with pytest.raises(ValueError, match="complete confirmed inputs"):
+        m.LeveragedETFSignal(
+            direction="inverse",
+            inputs_complete=True,
+            trend_confirmed=True,
+            momentum_confirmed=True,
+            breadth_confirmed=False,
+            liquidity_confirmed=True,
+            volatility_confirmed=True,
+            vix_value=27,
+            recommended=[
+                {
+                    "ticker": "SQQQ",
+                    "leverage": 3,
+                    "position_pct": 3,
+                    "stop_loss": -5,
+                    "max_hold_days": 2,
+                }
+            ],
+        )
+
+    with pytest.raises(ValueError, match="numeric observations"):
+        m.LeveragedETFSignal(
+            direction="long",
+            inputs_complete=True,
+            trend_confirmed=True,
+            momentum_confirmed=True,
+            breadth_confirmed=True,
+            liquidity_confirmed=True,
+            volatility_confirmed=True,
+            vix_value=20,
+            underlying_index="^NDX",
+            recommended=[
+                {"ticker": "TQQQ", "leverage": 3, "position_pct": 3,
+                 "stop_loss": -5, "max_hold_days": 2}
+            ],
+        )
+
+    valid_long = m.LeveragedETFSignal(
+        direction="long",
+        inputs_complete=True,
+        trend_confirmed=True,
+        momentum_confirmed=True,
+        breadth_confirmed=True,
+        liquidity_confirmed=True,
+        volatility_confirmed=True,
+        vix_value=20,
+        underlying_index="^NDX",
+        price_vs_20ma_pct=2,
+        ma20_slope_pct=1,
+        macd_histogram=0.5,
+        breadth_decline_advance_ratio=0.8,
+        volume_to_20d_ratio=1.1,
+        recommended=[
+            {"ticker": "TQQQ", "leverage": 3, "position_pct": 3,
+             "stop_loss": -5, "max_hold_days": 2}
+        ],
+    )
+    assert valid_long.direction == "long"
+
+    with pytest.raises(ValueError, match="VIX above 30"):
+        m.LeveragedETFSignal(
+            direction="inverse",
+            inputs_complete=True,
+            trend_confirmed=True,
+            momentum_confirmed=True,
+            breadth_confirmed=True,
+            liquidity_confirmed=True,
+            volatility_confirmed=True,
+            vix_value=31,
+            recommended=[
+                {
+                    "ticker": "SQQQ",
+                    "leverage": 3,
+                    "position_pct": 3,
+                    "stop_loss": -5,
+                    "max_hold_days": 2,
+                }
+            ],
+        )
+
+
+def test_us_models_do_not_share_mutable_defaults():
+    m = load_schemas()
+    first = m.USFinancialReport(ticker="AAA")
+    second = m.USFinancialReport(ticker="BBB")
+    first.data_sources.append("SEC")
+    first.peer_comparison.append({"ticker": "PEER"})
+    assert second.data_sources == []
+    assert second.peer_comparison == []
+
+def test_us_evidence_models_fail_closed_across_fields():
+    m = load_schemas()
+
+    with pytest.raises(ValueError, match="incomplete market evidence"):
+        m.USMarketDataReport(indices={}, market_regime="risk_on", data_quality="A")
+
+    valid_index = {
+        "price": 100,
+        "5d_return": 1,
+        "1m_return": 2,
+        "3m_return": 3,
+        "52w_high_drawdown": -4,
+        "above_50ma": True,
+        "above_200ma": True,
+        "volatility_60d": 15,
+    }
+    with pytest.raises(ValueError, match="risk_on requires VIX below 25"):
+        m.USMarketDataReport(
+            indices={key: valid_index for key in ("^GSPC", "^IXIC", "^DJI", "^RUT")},
+            vix={"value": 35}, dxy={"value": 104}, tnx={"value": 4.2},
+            sector_rotation={"weakening": ["XLK"]},
+            data_date="2026-07-27", market_regime="risk_on", data_quality="A",
+        )
+
+    with pytest.raises(ValueError, match="directional market conclusion requires data no older"):
+        m.USMarketDataReport(
+            indices={key: valid_index for key in ("^GSPC", "^IXIC", "^DJI", "^RUT")},
+            vix={"value": 16}, dxy={"value": 104}, tnx={"value": 4.2},
+            sector_rotation={"trending_high": ["XLK"]},
+            data_date="2000-01-01", market_regime="risk_on",
+            position_advice="increase_risk", data_quality="A",
+        )
+
+    empty_market = m.USMarketDataReport(indices={})
+    assert empty_market.market_regime == "unknown"
+    assert empty_market.data_quality.value == "D"
+
+    hollow_index = {
+        "price": 1,
+        "5d_return": 0,
+        "1m_return": 0,
+        "3m_return": 0,
+        "52w_high_drawdown": 0,
+        "above_50ma": False,
+        "above_200ma": False,
+        "volatility_60d": 0,
+    }
+    with pytest.raises(ValueError):
+        m.USMarketDataReport(
+            indices={key: hollow_index for key in ("^GSPC", "^IXIC", "^DJI", "^RUT")},
+            vix={"value": 0}, dxy={"value": 0}, tnx={"value": 0},
+            data_date="2026-07-27", market_regime="risk_on", data_quality="A",
+        )
+
+    with pytest.raises(ValueError, match="incomplete financial evidence"):
+        m.USFinancialReport(ticker="NVDA", financial_score=80, data_quality="A")
+
+    empty_financial = m.USFinancialReport(ticker="NVDA")
+    assert empty_financial.financial_score == 0
+    assert empty_financial.data_quality.value == "D"
+
+    with pytest.raises(ValueError, match="incomplete financial evidence"):
+        m.USFinancialReport(
+            ticker="NVDA", financial_score=80, data_sources=["SEC EDGAR"], data_quality="A"
+        )
+
+    with pytest.raises(ValueError, match="incomplete financial evidence"):
+        m.USFinancialReport(
+            ticker="NVDA",
+            financial_score=100,
+            valuation={"forward_pe": 1},
+            growth={"revenue_yoy": "verified"},
+            profitability={"roe": 1},
+            balance_sheet={"cash_to_debt": 1},
+            peer_comparison=[{"ticker": "PEER"}],
+            ocifq={key: "verified" for key in (
+                "oligopoly", "catalyst", "industry_moat", "financial_blast", "quarterly_continuity"
+            )},
+            data_sources=["source"],
+            data_quality="A",
+        )
+
+    with pytest.raises(ValueError, match="incomplete financial evidence"):
+        m.USFinancialReport(
+            ticker="NVDA", financial_score=80,
+            valuation={"forward_pe": 30, "fcf_yield": 3},
+            growth={"revenue_yoy": "+20%", "eps_yoy": "+25%"},
+            profitability={"roe": 30, "gross_margin": 60},
+            balance_sheet={"cash_to_debt": 2, "current_ratio": 1.5},
+            peer_comparison=[{"ticker": "AMD", "forward_pe": 25}],
+            ocifq={key: "substantive evidence from current filings" for key in (
+                "oligopoly", "catalyst", "industry_moat", "financial_blast", "quarterly_continuity"
+            )},
+            data_sources=["SEC", "SEC EDGAR"], data_quality="A",
+        )
+
+    with pytest.raises(ValueError):
+        m.USFinancialReport(
+            ticker="NVDA", valuation={"forward_pe": float("nan"), "fcf_yield": 3}
+        )
+
+    with pytest.raises(ValueError, match="incomplete financial evidence"):
+        m.USFinancialReport(
+            ticker="NVDA",
+            financial_score=80,
+            valuation={"forward_pe": 30, "fcf_yield": 3},
+            growth={"revenue_yoy": "+20%", "eps_yoy": "+25%"},
+            profitability={"roe": 30, "gross_margin": 60},
+            balance_sheet={"cash_to_debt": 2, "current_ratio": 1.5},
+            peer_comparison=[{"ticker": "AMD", "forward_pe": 25}],
+            ocifq={
+                "oligopoly": "market share supports durable leadership",
+                "catalyst": "demand growth supported by current filing",
+                "industry_moat": "peer margins show durable advantage",
+                "financial_blast": "revenue +20%, EPS +25%, FCF +18%",
+                "quarterly_continuity": "four consecutive quarters beat estimates",
+            },
+            data_sources=["SEC EDGAR", "yfinance"],
+            evidence_refs={key: "https://evil.example/fake" for key in (
+                "valuation", "growth", "profitability", "balance_sheet", "peers",
+                "oligopoly", "catalyst", "industry_moat", "financial_blast", "quarterly_continuity",
+            )},
+            data_quality="A",
+        )
+
+    complete_financial = m.USFinancialReport(
+        ticker="NVDA",
+        financial_score=80,
+        valuation={"forward_pe": 30, "fcf_yield": 3.5},
+        growth={"revenue_yoy": "revenue grew 20%", "eps_yoy": "EPS grew 25%"},
+        profitability={"roe": 30, "gross_margin": 65},
+        balance_sheet={"cash_to_debt": 2, "current_ratio": 1.8},
+        peer_comparison=[{"ticker": "AMD", "forward_pe": 25}],
+        ocifq={
+            "oligopoly": "market share data supports durable leadership",
+            "catalyst": "multi-year demand growth supported by filings",
+            "industry_moat": "peer margins show persistent operating advantage",
+            "financial_blast": "revenue +20%, EPS +25%, and FCF +18%",
+            "quarterly_continuity": "four consecutive quarters beat consensus",
+        },
+        data_sources=["SEC EDGAR", "yfinance"],
+        evidence_refs={
+            "valuation": "https://finance.yahoo.com/quote/NVDA/key-statistics",
+            "growth": "https://www.sec.gov/Archives/edgar/data/1045810/filing-growth.htm",
+            "profitability": "https://www.sec.gov/Archives/edgar/data/1045810/filing-profitability.htm",
+            "balance_sheet": "https://www.sec.gov/Archives/edgar/data/1045810/filing-balance.htm",
+            "peers": "https://finance.yahoo.com/quote/AMD/key-statistics",
+            "oligopoly": "https://www.sec.gov/Archives/edgar/data/1045810/filing-business.htm",
+            "catalyst": "https://www.sec.gov/Archives/edgar/data/1045810/filing-mdna.htm",
+            "industry_moat": "https://finance.yahoo.com/quote/NVDA/financials",
+            "financial_blast": "https://finance.yahoo.com/quote/NVDA/cash-flow",
+            "quarterly_continuity": "https://www.sec.gov/Archives/edgar/data/1045810/filing-quarterly.htm",
+        },
+        data_quality="A",
+    )
+    assert complete_financial.financial_score == 80
+
+    with pytest.raises(ValueError, match="incomplete risk evidence"):
+        m.USRiskReport(ticker="NVDA", overall_risk="low", risk_score=90, data_quality="A")
+
+    empty_risk = m.USRiskReport(ticker="NVDA")
+    assert empty_risk.overall_risk == "unknown"
+    assert empty_risk.risk_score == 0
+    assert empty_risk.data_quality.value == "D"
+
+    unknown_checks = {
+        key: {"status": "unknown", "detail": "not verified"}
+        for key in (
+            "delisting", "litigation", "insider_selling", "goodwill",
+            "debt", "customer_concentration", "regulatory", "accounting",
+        )
+    }
+    with pytest.raises(ValueError, match="incomplete risk evidence"):
+        m.USRiskReport(
+            ticker="NVDA", overall_risk="low", risk_score=100,
+            checks=unknown_checks, data_sources=["SEC EDGAR"], data_quality="A"
+        )
+
+    pass_checks = {
+        key: {"status": "pass", "detail": "No material issue found in current filing"}
+        for key in unknown_checks
+    }
+    with pytest.raises(ValueError, match="incomplete risk evidence"):
+        m.USRiskReport(
+            ticker="NVDA", overall_risk="critical", risk_score=0,
+            critical_alerts=["SEC fraud action requires immediate review"],
+            data_quality="D",
+        )
+
+    with pytest.raises(ValueError, match="critical alerts"):
+        m.USRiskReport(
+            ticker="NVDA", overall_risk="low", risk_score=100,
+            checks=pass_checks, critical_alerts=["SEC fraud action"],
+            data_sources=["SEC EDGAR", "yfinance"], data_quality="A"
+        )
+
+    with pytest.raises(ValueError, match="warnings cannot produce low risk"):
+        m.USRiskReport(
+            ticker="NVDA", overall_risk="low", risk_score=100,
+            checks=pass_checks, warnings=["material concentration warning"],
+            data_sources=["SEC EDGAR", "yfinance"], data_quality="A"
+        )
+
+    with pytest.raises(ValueError, match="all-pass risk checks"):
+        m.USRiskReport(
+            ticker="NVDA", overall_risk="low", risk_score=10,
+            checks=pass_checks, data_sources=["SEC EDGAR", "yfinance"], data_quality="A"
+        )
+
+    fail_checks = dict(pass_checks)
+    fail_checks["litigation"] = {"status": "fail", "detail": "material fraud case"}
+    with pytest.raises(ValueError, match="failed risk checks"):
+        m.USRiskReport(
+            ticker="NVDA", overall_risk="low", risk_score=90,
+            checks=fail_checks, data_sources=["SEC EDGAR", "yfinance"], data_quality="A"
+        )
+
+    risk_a = m.USRiskReport(ticker="AAA")
+    risk_b = m.USRiskReport(ticker="BBB")
+    risk_a.warnings.append("test")
+    assert risk_b.warnings == []
+
+
+def test_risk_alert_bidirectional_consistency():
+    m = load_schemas()
+    pass_checks = {
+        key: {"status": "pass", "detail": "No material issue found in current filing"}
+        for key in ("delisting", "litigation", "insider_selling", "goodwill",
+                     "debt", "customer_concentration", "regulatory", "accounting")
+    }
+    base = dict(ticker="X", data_sources=["SEC EDGAR", "yfinance"], data_quality="A")
+
+    with pytest.raises(ValueError, match="warn risk checks require non-empty warnings"):
+        warn_checks = dict(pass_checks)
+        warn_checks["litigation"] = {"status": "warn", "detail": "pending class action disclosed in latest 10-Q"}
+        m.USRiskReport(**base, checks=warn_checks, overall_risk="medium", risk_score=60)
+
+    with pytest.raises(ValueError, match="warnings require at least one warn risk check"):
+        m.USRiskReport(**base, checks=pass_checks, overall_risk="medium", risk_score=60,
+                        warnings=["unsupported concentration claim"])
+
+    with pytest.raises(ValueError, match="critical overall risk with failed checks requires critical alerts"):
+        fail_checks = dict(pass_checks)
+        fail_checks["debt"] = {"status": "fail", "detail": "interest coverage ratio below 1x per latest 10-K"}
+        m.USRiskReport(**base, checks=fail_checks, overall_risk="critical", risk_score=10)
+
+
+def test_incomplete_risk_cannot_carry_critical_alerts():
+    m = load_schemas()
+    with pytest.raises(ValueError, match="incomplete risk evidence cannot carry critical alerts"):
+        m.USRiskReport(ticker="X", overall_risk="unknown", risk_score=0,
+                        critical_alerts=["unsubstantiated alert"],
+                        checks={}, data_quality="D")
+
+
+def test_avoid_direction_rejects_confirmations():
+    m = load_schemas()
+    with pytest.raises(ValueError, match="avoid direction cannot carry confirmed inputs"):
+        m.LeveragedETFSignal(direction="avoid", inputs_complete=True)
+
+
+def test_evidence_sources_dedup_across_same_underlying():
+    m = load_schemas()
+    refs = {
+        "valuation": "https://www.sec.gov/Archives/edgar/data/1234/report.htm",
+        "growth": "https://www.sec.gov/Archives/edgar/data/1234/report.htm#fragment",
+        "profitability": "https://www.sec.gov/Archives/edgar/data/1234/report.htm#other",
+        "balance_sheet": "https://www.sec.gov/Archives/edgar/data/1234/report.htm#bs",
+        "peers": "https://www.sec.gov/Archives/edgar/data/1234/report.htm#peers",
+        "oligopoly": "https://finance.yahoo.com/quote/X",
+        "catalyst": "https://www.sec.gov/Archives/edgar/data/1234/report.htm#catalyst",
+        "industry_moat": "https://www.sec.gov/Archives/edgar/data/1234/report.htm#moat",
+        "financial_blast": "https://www.sec.gov/Archives/edgar/data/1234/report.htm#fin",
+        "quarterly_continuity": "https://www.sec.gov/Archives/edgar/data/1234/report.htm#q",
+    }
+    with pytest.raises(ValueError, match="incomplete financial evidence"):
+        m.USFinancialReport(
+            ticker="X", financial_score=80,
+            valuation={"forward_pe": 30, "fcf_yield": 3},
+            growth={"revenue_yoy": "+20%", "eps_yoy": "+25%"},
+            profitability={"roe": 30, "gross_margin": 60},
+            balance_sheet={"cash_to_debt": 2, "current_ratio": 1.5},
+            peer_comparison=[{"ticker": "AMD", "forward_pe": 25}],
+            ocifq={k: "substantive evidence from current filings filed with the SEC" for k in (
+                "oligopoly", "catalyst", "industry_moat", "financial_blast", "quarterly_continuity")},
+            data_sources=["SEC", "company 10-k"], data_quality="A",
+            evidence_refs=refs,
+        )
+
+
+def test_us_index_alias_contract_round_trips_as_documented_json():
+    m = load_schemas()
+    payload = {
+        "price": 100,
+        "5d_return": 1.0,
+        "1m_return": 2.0,
+        "3m_return": 3.0,
+        "52w_high_drawdown": -4.0,
+        "above_50ma": True,
+        "above_200ma": True,
+        "volatility_60d": 15.0,
+    }
+    row = m.IndexData(**payload)
+    dumped = row.model_dump()
+    assert dumped["5d_return"] == 1.0
+    assert dumped["1m_return"] == 2.0
+    assert dumped["3m_return"] == 3.0
+    assert dumped["52w_high_drawdown"] == -4.0
+    assert "five_day_return" not in dumped
+    assert m.IndexData(**dumped) == row
 
 
 def test_schema_renderers_accept_partial_optional_market_data():
