@@ -8,7 +8,7 @@ schemas alone does not wire structured output into the runtime.
 from __future__ import annotations
 
 from enum import Enum
-from typing import Dict, List, Literal, Optional
+from typing import Any, Dict, List, Literal, Optional
 
 from pydantic import BaseModel, Field, model_validator
 
@@ -725,3 +725,132 @@ def render_etf_review_result(result: ETFReviewResult) -> str:
     if result.must_fix:
         lines.append(f"必须修正: {'; '.join(result.must_fix)}")
     return "\n".join(lines)
+
+
+# ============================================================================
+# US Market subagent models (v5.2)
+# ============================================================================
+
+
+class IndexData(BaseModel):
+    """Single index data point."""
+    price: float
+    five_day_return: float = Field(alias="5d_return")
+    one_month_return: float = Field(alias="1m_return")
+    three_month_return: float = Field(alias="3m_return")
+    fifty_two_week_high_drawdown: float = Field(alias="52w_high_drawdown")
+    above_50ma: bool
+    above_200ma: bool
+    volatility_60d: float
+
+
+class SectorRotation(BaseModel):
+    """Sector rotation classification."""
+    trending_high: list[str] = []
+    pullback_opportunity: list[str] = []
+    weakening: list[str] = []
+    neutral: list[str] = []
+
+
+class USMarketDataReport(BaseModel):
+    """US market data collection result."""
+    indices: dict[str, IndexData]
+    vix: dict[str, Any] = {}
+    dxy: dict[str, Any] = {}
+    tnx: dict[str, Any] = {}
+    sector_rotation: SectorRotation = SectorRotation()
+    market_regime: str = "neutral"  # risk_on / risk_off / neutral
+    position_advice: str = ""
+    leveraged_signal: dict[str, Any] = {}  # see us_market_data.md for structure
+    data_quality: DataQuality = DataQuality.B
+    data_date: str = ""
+    errors: list[str] = []
+
+
+class ValuationMetrics(BaseModel):
+    """US stock valuation."""
+    forward_pe: Optional[float] = None
+    trailing_pe: Optional[float] = None
+    ev_ebitda: Optional[float] = None
+    peg: Optional[float] = None
+    fcf_yield: Optional[float] = None
+
+
+class GrowthMetrics(BaseModel):
+    """Revenue/earnings/FCF growth and beat streak."""
+    revenue_yoy: str = ""
+    eps_yoy: str = ""
+    fcf_yoy: str = ""
+    revenue_beat_streak: int = 0
+    eps_beat_streak: int = 0
+
+
+class ProfitabilityMetrics(BaseModel):
+    """Profitability ratios."""
+    roe: Optional[float] = None
+    gross_margin: Optional[float] = None
+    operating_margin: Optional[float] = None
+    net_margin: Optional[float] = None
+
+
+class BalanceSheetMetrics(BaseModel):
+    """Key balance sheet strength indicators."""
+    debt_to_equity: Optional[float] = None
+    current_ratio: Optional[float] = None
+    cash_to_debt: Optional[float] = None
+    goodwill_to_assets: Optional[float] = None
+
+
+class PeerComparison(BaseModel):
+    """Single peer comparison row."""
+    ticker: str
+    forward_pe: Optional[float] = None
+    gross_margin: Optional[float] = None
+    revenue_yoy: str = ""
+
+
+class OCIQFResult(BaseModel):
+    """OCIFQ five-dimension result for US stocks."""
+    oligopoly: str = ""
+    catalyst: str = ""
+    industry_moat: str = ""
+    financial_blast: str = ""
+    quarterly_continuity: str = ""
+
+
+class USFinancialReport(BaseModel):
+    """US stock financial analysis report."""
+    ticker: str
+    company_name: str = ""
+    currency: str = "USD"
+    financial_score: int = 0  # 0-100
+    valuation: ValuationMetrics = ValuationMetrics()
+    growth: GrowthMetrics = GrowthMetrics()
+    profitability: ProfitabilityMetrics = ProfitabilityMetrics()
+    balance_sheet: BalanceSheetMetrics = BalanceSheetMetrics()
+    peer_comparison: list[PeerComparison] = []
+    ocifq: OCIQFResult = OCIQFResult()
+    accounting_notes: str = ""
+    data_sources: list[str] = []
+    data_quality: DataQuality = DataQuality.B
+    errors: list[str] = []
+
+
+class RiskCheckResult(BaseModel):
+    """Single risk check result."""
+    status: str  # pass / warn / fail
+    detail: str = ""
+
+
+class USRiskReport(BaseModel):
+    """US stock risk screening report."""
+    ticker: str
+    overall_risk: str = "medium"  # low / medium / high / critical
+    risk_score: int = 50  # 0-100, higher = safer
+    checks: dict[str, RiskCheckResult] = {}
+    critical_alerts: list[str] = []
+    warnings: list[str] = []
+    risk_bias: str = ""  # 偏多/偏空/中性
+    data_sources: list[str] = []
+    data_quality: DataQuality = DataQuality.B
+    errors: list[str] = []

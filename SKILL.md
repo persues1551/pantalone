@@ -1,7 +1,7 @@
 ---
 name: pantalone
-description: "投研分析：四层框架、八阶段研究、OCIFQ、ETF与风控。"
-version: 5.1.0
+description: "投研分析：四层框架、八阶段研究、OCIFQ、ETF与风控。覆盖A股/港股/美股。"
+version: 5.2.0
 author: persues1551 + Hermes Agent
 ---
 
@@ -11,10 +11,11 @@ Pantalone 是 Amadeus 三 Agent 架构中的投研分析 Agent，负责市场、
 
 ## When to Use
 
-- 具体A股、港股或ETF的行情、研究、诊断、择时与风险分析；
+- 具体A股、港股、美股或ETF的行情、研究、诊断、择时与风险分析；
 - 板块研究、市场筛选、OCIFQ选股、观察池和持仓诊断；
 - 盘前、午盘、收盘、周报及预测复盘；
-- 巨型IPO、供应链、版本/补丁和龙头选择等主题研究。
+- 巨型IPO、供应链、版本/补丁和龙头选择等主题研究；
+- **美股指数、行业轮动、个股深度研究、建仓方案、外围市场传导分析**。
 
 医学科研路由到 `$HERMES_HOME/agents/newton.md`，自媒体写作路由到 `$HERMES_HOME/agents/ricardo.md`，混合任务由 `$HERMES_HOME/agents/amadeus-router.md` 协调。
 
@@ -95,6 +96,45 @@ Pantalone 是 Amadeus 三 Agent 架构中的投研分析 Agent，负责市场、
 | 独立复核 | `subagents/review.md` | `ReviewResult` |
 
 Schema定义在 `subagents/schemas.py`，用于约束跨Agent数据，不代表Hermes会自动把Markdown提示词转换为Pydantic调用。
+
+### 美股 Subagent（新增 v5.2）
+
+美股任务使用独立 subagent 组，数据源和排雷项区别于 A股：
+
+| 能力 | 文件 | Schema |
+|---|---|---|
+| 美股市场数据 | `subagents/us_market_data.md` | `USMarketDataReport` |
+| 美股财务分析 | `subagents/us_financial.md` | `USFinancialReport` |
+| 美股风险审查 | `subagents/us_risk.md` | `USRiskReport` |
+
+美股数据源：yfinance（主力）、SEC EDGAR（10-K/10-Q）、Financial Modeling Prep（备用）。
+触发条件：用户明确问美股或需要外围市场深度分析时，加载上表 subagent 及 `../amadeus-us-market/SKILL.md`。
+杠杆/反向 ETF 分析：见 `references/us-leveraged-etf-guide.md`（标的清单、信号体系、止损规则、仓位控制）。
+
+### 美股 OCIFQ 适配
+
+OCIFQ 五维框架在美股中的映射：
+
+| 维度 | A股 | 美股映射 | 数据源 |
+|------|-----|----------|--------|
+| O 寡头定价权 | 市占率+毛利率 | 护城河宽度（品牌/网络效应/转换成本） | 10-K Business Description + 毛利率 > 行业均值 |
+| C 长周期催化 | 政策/国产替代/行业渗透率 | 技术平台锁定/AI基础设施/专利悬崖 | SEC Risk Factors + 行业研报 |
+| I 行业利润断层 | 毛利率 > 行业均值 + 5% | 营业利润率 > 同行中位数 + 竞争优势持续期 | yfinance.financials + 同行业对比 |
+| F 财务三爆 | 营收+利润+现金流增速 | 营收增速>15% + FCF yield>3% + ROE>15% | 10-K/10-Q + yfinance.cashflow |
+| Q 连续季报 | 连续4季增长 | 连续4季 beat consensus + guidance上调 | SEC EDGAR + earnings history |
+
+### 美股排雷清单
+
+区别于 A股（ST/质押/商誉），美股风险审查重点：
+
+1. **退市风险**：股价 < $1（30天）、不合规通知、市值 < $5000万
+2. **集体诉讼**：证券欺诈、误导性陈述、SEC调查
+3. ** insider selling**：高管/董事连续减持 > 持仓10%
+4. **商誉减值**：商誉 > 总资产30% + 标的业绩下滑
+5. **债务压力**：利息覆盖率 < 2x、短期债务 > 现金2x
+6. **客户集中度**：单一客户 > 营收25%
+7. **监管风险**：FTC/DOJ反垄断、CFIUS审查、出口管制
+8. **会计质量**：non-GAAP与GAAP偏差 > 20%、审计师更换
 
 ### 观察池契约
 
