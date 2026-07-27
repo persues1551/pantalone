@@ -103,7 +103,7 @@ delegate_task(
     "liquidity_confirmed": true,
     "volatility_confirmed": true,
     "vix_value": 16.5,
-    "underlying_index": "^IXIC",
+    "underlying_index": "^NDX",
     "price_vs_20ma_pct": 2.4,
     "ma20_slope_pct": 1.1,
     "macd_histogram": 0.8,

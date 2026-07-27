@@ -96,7 +96,19 @@ delegate_task(
     "quarterly_continuity": "连续8季beat consensus + 连续6季guidance上调"
   },
   "accounting_notes": "GAAP口径，non-GAAP与GAAP偏差<5%",
-  "data_sources": ["yfinance", "SEC EDGAR"],
+  "data_sources": ["SEC EDGAR", "yfinance"],
+  "evidence_refs": {
+  "valuation": "https://finance.yahoo.com/quote/NVDA/key-statistics",
+  "growth": "https://www.sec.gov/Archives/edgar/data/{CIK}/{accession}/report.htm",
+  "profitability": "https://finance.yahoo.com/quote/NVDA/financials",
+  "balance_sheet": "https://finance.yahoo.com/quote/NVDA/balance-sheet",
+  "peers": "https://finance.yahoo.com/quote/AMD/key-statistics",
+  "oligopoly": "https://www.sec.gov/Archives/edgar/data/{CIK}/{accession}/business.htm",
+  "catalyst": "https://www.sec.gov/Archives/edgar/data/{CIK}/{accession}/mdna.htm",
+  "industry_moat": "https://finance.yahoo.com/quote/NVDA/financials",
+  "financial_blast": "https://finance.yahoo.com/quote/NVDA/cash-flow",
+  "quarterly_continuity": "https://www.sec.gov/Archives/edgar/data/{CIK}/{accession}/quarterly.htm"
+  },
   "data_quality": "A",
   "errors": []
 }

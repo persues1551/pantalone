@@ -434,6 +434,7 @@ def test_us_leveraged_signal_fails_closed_and_bounds_exposure():
             liquidity_confirmed=True,
             volatility_confirmed=True,
             vix_value=20,
+            underlying_index="^NDX",
             recommended=[
                 {"ticker": "TQQQ", "leverage": 3, "position_pct": 3,
                  "stop_loss": -5, "max_hold_days": 2}
@@ -449,7 +450,7 @@ def test_us_leveraged_signal_fails_closed_and_bounds_exposure():
         liquidity_confirmed=True,
         volatility_confirmed=True,
         vix_value=20,
-        underlying_index="^IXIC",
+        underlying_index="^NDX",
         price_vs_20ma_pct=2,
         ma20_slope_pct=1,
         macd_histogram=0.5,
@@ -594,6 +595,30 @@ def test_us_evidence_models_fail_closed_across_fields():
             ticker="NVDA", valuation={"forward_pe": float("nan"), "fcf_yield": 3}
         )
 
+    with pytest.raises(ValueError, match="incomplete financial evidence"):
+        m.USFinancialReport(
+            ticker="NVDA",
+            financial_score=80,
+            valuation={"forward_pe": 30, "fcf_yield": 3},
+            growth={"revenue_yoy": "+20%", "eps_yoy": "+25%"},
+            profitability={"roe": 30, "gross_margin": 60},
+            balance_sheet={"cash_to_debt": 2, "current_ratio": 1.5},
+            peer_comparison=[{"ticker": "AMD", "forward_pe": 25}],
+            ocifq={
+                "oligopoly": "market share supports durable leadership",
+                "catalyst": "demand growth supported by current filing",
+                "industry_moat": "peer margins show durable advantage",
+                "financial_blast": "revenue +20%, EPS +25%, FCF +18%",
+                "quarterly_continuity": "four consecutive quarters beat estimates",
+            },
+            data_sources=["SEC EDGAR", "yfinance"],
+            evidence_refs={key: "https://evil.example/fake" for key in (
+                "valuation", "growth", "profitability", "balance_sheet", "peers",
+                "oligopoly", "catalyst", "industry_moat", "financial_blast", "quarterly_continuity",
+            )},
+            data_quality="A",
+        )
+
     complete_financial = m.USFinancialReport(
         ticker="NVDA",
         financial_score=80,
@@ -610,6 +635,18 @@ def test_us_evidence_models_fail_closed_across_fields():
             "quarterly_continuity": "four consecutive quarters beat consensus",
         },
         data_sources=["SEC EDGAR", "yfinance"],
+        evidence_refs={
+            "valuation": "https://finance.yahoo.com/quote/NVDA/key-statistics",
+            "growth": "https://www.sec.gov/Archives/edgar/data/1045810/filing-growth.htm",
+            "profitability": "https://www.sec.gov/Archives/edgar/data/1045810/filing-profitability.htm",
+            "balance_sheet": "https://www.sec.gov/Archives/edgar/data/1045810/filing-balance.htm",
+            "peers": "https://finance.yahoo.com/quote/AMD/key-statistics",
+            "oligopoly": "https://www.sec.gov/Archives/edgar/data/1045810/filing-business.htm",
+            "catalyst": "https://www.sec.gov/Archives/edgar/data/1045810/filing-mdna.htm",
+            "industry_moat": "https://finance.yahoo.com/quote/NVDA/financials",
+            "financial_blast": "https://finance.yahoo.com/quote/NVDA/cash-flow",
+            "quarterly_continuity": "https://www.sec.gov/Archives/edgar/data/1045810/filing-quarterly.htm",
+        },
         data_quality="A",
     )
     assert complete_financial.financial_score == 80

@@ -12,6 +12,7 @@ from enum import Enum
 import math
 import re
 from typing import Any, Dict, List, Literal, Optional
+from urllib.parse import urlparse
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -811,6 +812,14 @@ LEVERAGED_ETF_CONTRACTS = {
     "SDS": ("inverse", 2.0, -4.0, 8),
 }
 
+LEVERAGED_ETF_UNDERLYINGS = {
+    "TQQQ": "^NDX", "SQQQ": "^NDX", "QLD": "^NDX", "QID": "^NDX",
+    "UPRO": "^GSPC", "SPXL": "^GSPC", "SPXU": "^GSPC", "SSO": "^GSPC", "SDS": "^GSPC",
+    "SOXL": "NYSE_SEMICONDUCTOR", "SOXS": "NYSE_SEMICONDUCTOR",
+    "TECL": "TECHNOLOGY_SELECT_SECTOR", "TECS": "TECHNOLOGY_SELECT_SECTOR",
+    "UDOW": "^DJI", "SDOW": "^DJI",
+}
+
 
 class LeveragedETFPosition(BaseModel):
     """A bounded leveraged/inverse ETF tactical position."""
@@ -893,6 +902,9 @@ class LeveragedETFSignal(BaseModel):
             exposure = sum(item.position_pct * item.leverage / 100 for item in self.recommended)
             if exposure > 0.5:
                 raise ValueError("recommended leveraged notional exposure must be <= 0.5")
+            expected_underlyings = {LEVERAGED_ETF_UNDERLYINGS[ticker] for ticker in tickers}
+            if expected_underlyings != {self.underlying_index.strip().upper()}:
+                raise ValueError("underlying index must match every recommended product")
             observations = (
                 self.underlying_index.strip(),
                 self.price_vs_20ma_pct,
@@ -998,8 +1010,11 @@ class USMarketDataReport(BaseModel):
         ):
             raise ValueError("data quality D cannot carry a directional market conclusion")
         if evidence_complete:
-            if self.market_regime != "unknown" and parsed_date is not None and parsed_date < date.today() - timedelta(days=3):
-                raise ValueError("directional market conclusion requires data no older than 3 days")
+            if self.market_regime != "unknown" and parsed_date is not None:
+                if parsed_date > date.today():
+                    raise ValueError("directional market conclusion cannot use a future data date")
+                if parsed_date < date.today() - timedelta(days=3):
+                    raise ValueError("directional market conclusion requires data no older than 3 days")
             actual_vix = float(self.vix["value"])
             index_rows = [self.indices[key] for key in required_indices]
             above_50 = sum(row.above_50ma for row in index_rows)
@@ -1091,11 +1106,28 @@ class USFinancialReport(BaseModel):
     ocifq: OCIQFResult = Field(default_factory=OCIQFResult)
     accounting_notes: str = ""
     data_sources: list[str] = Field(default_factory=list)
+    evidence_refs: dict[str, str] = Field(default_factory=dict)
     data_quality: DataQuality = DataQuality.D
     errors: list[str] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def enforce_financial_evidence(self) -> "USFinancialReport":
+        required_refs = {
+            "valuation", "growth", "profitability", "balance_sheet", "peers",
+            "oligopoly", "catalyst", "industry_moat", "financial_blast", "quarterly_continuity",
+        }
+        trusted_hosts = {
+            "sec.gov", "www.sec.gov", "data.sec.gov", "finance.yahoo.com",
+            "financialmodelingprep.com", "site.financialmodelingprep.com",
+        }
+        refs_complete = required_refs.issubset(self.evidence_refs) and all(
+            urlparse(self.evidence_refs[key]).scheme == "https"
+            and urlparse(self.evidence_refs[key]).hostname in trusted_hosts
+            and urlparse(self.evidence_refs[key]).path not in {"", "/"}
+            for key in required_refs
+        ) and len(set(self.evidence_refs.values())) >= 5 and len(
+            {urlparse(self.evidence_refs[key]).hostname for key in required_refs}
+        ) >= 2
         valuation_evidence = sum(_finite_number(value) and abs(value) > 1e-12 for value in self.valuation.model_dump().values()) >= 2
         growth_evidence = sum(
             _percentage_evidence(value) if isinstance(value, str) else _finite_number(value) and value > 0
@@ -1132,6 +1164,7 @@ class USFinancialReport(BaseModel):
                 balance_evidence,
                 peer_evidence,
                 ocifq_complete,
+                refs_complete,
                 not self.errors,
             )
         )
