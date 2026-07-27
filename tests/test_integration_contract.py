@@ -290,6 +290,7 @@ def test_us_leveraged_signal_fails_closed_and_bounds_exposure():
             inputs_complete=True,
             trend_confirmed=True,
             momentum_confirmed=True,
+            breadth_confirmed=True,
             liquidity_confirmed=True,
             volatility_confirmed=True,
             vix_value=20,
@@ -310,6 +311,7 @@ def test_us_leveraged_signal_fails_closed_and_bounds_exposure():
             inputs_complete=True,
             trend_confirmed=True,
             momentum_confirmed=True,
+            breadth_confirmed=True,
             liquidity_confirmed=True,
             volatility_confirmed=True,
             vix_value=20,
@@ -330,6 +332,7 @@ def test_us_leveraged_signal_fails_closed_and_bounds_exposure():
             inputs_complete=True,
             trend_confirmed=True,
             momentum_confirmed=True,
+            breadth_confirmed=True,
             liquidity_confirmed=True,
             volatility_confirmed=True,
             vix_value=20,
@@ -377,6 +380,7 @@ def test_us_leveraged_signal_fails_closed_and_bounds_exposure():
             inputs_complete=True,
             trend_confirmed=True,
             momentum_confirmed=True,
+            breadth_confirmed=True,
             liquidity_confirmed=True,
             volatility_confirmed=True,
             vix_value=20,
@@ -398,12 +402,34 @@ def test_us_leveraged_signal_fails_closed_and_bounds_exposure():
             ],
         )
 
+    with pytest.raises(ValueError, match="complete confirmed inputs"):
+        m.LeveragedETFSignal(
+            direction="inverse",
+            inputs_complete=True,
+            trend_confirmed=True,
+            momentum_confirmed=True,
+            breadth_confirmed=False,
+            liquidity_confirmed=True,
+            volatility_confirmed=True,
+            vix_value=27,
+            recommended=[
+                {
+                    "ticker": "SQQQ",
+                    "leverage": 3,
+                    "position_pct": 3,
+                    "stop_loss": -5,
+                    "max_hold_days": 2,
+                }
+            ],
+        )
+
     with pytest.raises(ValueError, match="VIX above 30"):
         m.LeveragedETFSignal(
             direction="inverse",
             inputs_complete=True,
             trend_confirmed=True,
             momentum_confirmed=True,
+            breadth_confirmed=True,
             liquidity_confirmed=True,
             volatility_confirmed=True,
             vix_value=31,

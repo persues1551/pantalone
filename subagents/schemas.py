@@ -805,6 +805,7 @@ class LeveragedETFSignal(BaseModel):
     inputs_complete: bool = False
     trend_confirmed: bool = False
     momentum_confirmed: bool = False
+    breadth_confirmed: bool = False
     liquidity_confirmed: bool = False
     volatility_confirmed: bool = False
     vix_value: Optional[float] = Field(default=None, ge=0)
@@ -823,6 +824,7 @@ class LeveragedETFSignal(BaseModel):
             self.inputs_complete,
             self.trend_confirmed,
             self.momentum_confirmed,
+            self.breadth_confirmed,
             self.liquidity_confirmed,
             self.volatility_confirmed,
         )

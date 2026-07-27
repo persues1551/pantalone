@@ -99,6 +99,7 @@ delegate_task(
     "inputs_complete": true,
     "trend_confirmed": true,
     "momentum_confirmed": true,
+    "breadth_confirmed": true,
     "liquidity_confirmed": true,
     "volatility_confirmed": true,
     "vix_value": 16.5,
