@@ -68,7 +68,7 @@ delegate_task(
 
 | VIX | 10Y美债 | 建仓建议 |
 |-----|---------|----------|
-| <15 | <4.0% | 正常速度，可满仓 |
+| <15 | <4.0% | 正常速度，但仍受组合风险预算和单标的上限约束 |
 | 15-20 | 4.0-4.5% | 正常速度，控制杠杆 |
 | 20-25 | 4.5-5.0% | 减速建仓，保留20%现金 |
 | >25 | >5.0% | 暂停新建仓，只持有核心仓位 |
@@ -99,10 +99,12 @@ delegate_task(
     "vix_level": "low",
     "recommended": [{"ticker": "TQQQ", "leverage": 3, "position_pct": 5, "stop_loss": -5, "max_hold_days": 5}],
     "not_recommended": [],
-    "rationale": "VIX<15 + 纳指>20MA + MACD多头 → 3x做多信号"
+    "rationale": "示例数据满足趋势条件；仅生成研究候选，不构成自动交易指令"
   },
   "data_quality": "A",
   "data_date": "2026-07-25",
   "errors": []
 }
 ```
+
+未同时拿到 VIX、底层指数趋势、MACD 和成交量时，`direction` 必须为 `avoid`，不得用默认值补出方向。所有推荐须通过组合层风险预算复核；本 Subagent 不自动下单、不写入持仓或观察池。

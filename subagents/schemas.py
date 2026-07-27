@@ -746,25 +746,54 @@ class IndexData(BaseModel):
 
 class SectorRotation(BaseModel):
     """Sector rotation classification."""
-    trending_high: list[str] = []
-    pullback_opportunity: list[str] = []
-    weakening: list[str] = []
-    neutral: list[str] = []
+    trending_high: list[str] = Field(default_factory=list)
+    pullback_opportunity: list[str] = Field(default_factory=list)
+    weakening: list[str] = Field(default_factory=list)
+    neutral: list[str] = Field(default_factory=list)
+
+
+class LeveragedETFPosition(BaseModel):
+    """A bounded leveraged/inverse ETF tactical position."""
+
+    ticker: str
+    leverage: float = Field(gt=0, le=3)
+    position_pct: float = Field(ge=0, le=12)
+    stop_loss: float = Field(lt=0, ge=-8)
+    max_hold_days: int = Field(gt=0, le=8)
+
+
+class LeveragedETFSignal(BaseModel):
+    """Tactical signal that must allow the fail-closed avoid outcome."""
+
+    direction: str = Field(default="avoid", pattern="^(long|inverse|avoid)$")
+    vix_level: str = "unknown"
+    recommended: list[LeveragedETFPosition] = Field(default_factory=list)
+    not_recommended: list[str] = Field(default_factory=list)
+    rationale: str = ""
+
+    @model_validator(mode="after")
+    def enforce_avoid_and_exposure(self) -> "LeveragedETFSignal":
+        if self.direction == "avoid" and self.recommended:
+            raise ValueError("avoid direction cannot recommend leveraged positions")
+        exposure = sum(item.position_pct * item.leverage / 100 for item in self.recommended)
+        if exposure > 0.5:
+            raise ValueError("recommended leveraged notional exposure must be <= 0.5")
+        return self
 
 
 class USMarketDataReport(BaseModel):
     """US market data collection result."""
     indices: dict[str, IndexData]
-    vix: dict[str, Any] = {}
-    dxy: dict[str, Any] = {}
-    tnx: dict[str, Any] = {}
-    sector_rotation: SectorRotation = SectorRotation()
+    vix: dict[str, Any] = Field(default_factory=dict)
+    dxy: dict[str, Any] = Field(default_factory=dict)
+    tnx: dict[str, Any] = Field(default_factory=dict)
+    sector_rotation: SectorRotation = Field(default_factory=SectorRotation)
     market_regime: str = "neutral"  # risk_on / risk_off / neutral
     position_advice: str = ""
-    leveraged_signal: dict[str, Any] = {}  # see us_market_data.md for structure
+    leveraged_signal: LeveragedETFSignal = Field(default_factory=LeveragedETFSignal)
     data_quality: DataQuality = DataQuality.B
     data_date: str = ""
-    errors: list[str] = []
+    errors: list[str] = Field(default_factory=list)
 
 
 class ValuationMetrics(BaseModel):
@@ -823,34 +852,34 @@ class USFinancialReport(BaseModel):
     ticker: str
     company_name: str = ""
     currency: str = "USD"
-    financial_score: int = 0  # 0-100
-    valuation: ValuationMetrics = ValuationMetrics()
-    growth: GrowthMetrics = GrowthMetrics()
-    profitability: ProfitabilityMetrics = ProfitabilityMetrics()
-    balance_sheet: BalanceSheetMetrics = BalanceSheetMetrics()
-    peer_comparison: list[PeerComparison] = []
-    ocifq: OCIQFResult = OCIQFResult()
+    financial_score: int = Field(default=0, ge=0, le=100)
+    valuation: ValuationMetrics = Field(default_factory=ValuationMetrics)
+    growth: GrowthMetrics = Field(default_factory=GrowthMetrics)
+    profitability: ProfitabilityMetrics = Field(default_factory=ProfitabilityMetrics)
+    balance_sheet: BalanceSheetMetrics = Field(default_factory=BalanceSheetMetrics)
+    peer_comparison: list[PeerComparison] = Field(default_factory=list)
+    ocifq: OCIQFResult = Field(default_factory=OCIQFResult)
     accounting_notes: str = ""
-    data_sources: list[str] = []
+    data_sources: list[str] = Field(default_factory=list)
     data_quality: DataQuality = DataQuality.B
-    errors: list[str] = []
+    errors: list[str] = Field(default_factory=list)
 
 
 class RiskCheckResult(BaseModel):
     """Single risk check result."""
-    status: str  # pass / warn / fail
+    status: str = Field(pattern="^(pass|warn|fail|unknown)$")
     detail: str = ""
 
 
 class USRiskReport(BaseModel):
     """US stock risk screening report."""
     ticker: str
-    overall_risk: str = "medium"  # low / medium / high / critical
-    risk_score: int = 50  # 0-100, higher = safer
-    checks: dict[str, RiskCheckResult] = {}
-    critical_alerts: list[str] = []
-    warnings: list[str] = []
-    risk_bias: str = ""  # 偏多/偏空/中性
-    data_sources: list[str] = []
+    overall_risk: str = Field(default="medium", pattern="^(low|medium|high|critical|unknown)$")
+    risk_score: int = Field(default=50, ge=0, le=100)  # higher = safer
+    checks: dict[str, RiskCheckResult] = Field(default_factory=dict)
+    critical_alerts: list[str] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=list)
+    risk_bias: str = ""
+    data_sources: list[str] = Field(default_factory=list)
     data_quality: DataQuality = DataQuality.B
-    errors: list[str] = []
+    errors: list[str] = Field(default_factory=list)

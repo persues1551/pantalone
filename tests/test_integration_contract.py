@@ -237,6 +237,64 @@ def test_core_schemas_instantiate_and_render():
     assert all(isinstance(output, str) and output.strip() for output in outputs)
 
 
+def test_us_leveraged_signal_fails_closed_and_bounds_exposure():
+    m = load_schemas()
+
+    default_signal = m.LeveragedETFSignal()
+    assert default_signal.direction == "avoid"
+    assert default_signal.recommended == []
+
+    with pytest.raises(ValueError, match="avoid direction"):
+        m.LeveragedETFSignal(
+            direction="avoid",
+            recommended=[
+                {
+                    "ticker": "TQQQ",
+                    "leverage": 3,
+                    "position_pct": 5,
+                    "stop_loss": -5,
+                    "max_hold_days": 5,
+                }
+            ],
+        )
+
+    with pytest.raises(ValueError, match="notional exposure"):
+        m.LeveragedETFSignal(
+            direction="long",
+            recommended=[
+                {
+                    "ticker": "TQQQ",
+                    "leverage": 3,
+                    "position_pct": 12,
+                    "stop_loss": -5,
+                    "max_hold_days": 5,
+                },
+                {
+                    "ticker": "SOXL",
+                    "leverage": 3,
+                    "position_pct": 8,
+                    "stop_loss": -5,
+                    "max_hold_days": 4,
+                },
+            ],
+        )
+
+
+def test_us_models_do_not_share_mutable_defaults():
+    m = load_schemas()
+    first = m.USFinancialReport(ticker="AAA")
+    second = m.USFinancialReport(ticker="BBB")
+    first.data_sources.append("SEC")
+    first.peer_comparison.append({"ticker": "PEER"})
+    assert second.data_sources == []
+    assert second.peer_comparison == []
+
+    risk_a = m.USRiskReport(ticker="AAA")
+    risk_b = m.USRiskReport(ticker="BBB")
+    risk_a.warnings.append("test")
+    assert risk_b.warnings == []
+
+
 def test_schema_renderers_accept_partial_optional_market_data():
     m = load_schemas()
     macro = m.MacroAnalysisReport(

@@ -10,7 +10,7 @@
 ## 缺口清单（5项）
 
 ### 1. Agent 定义更新
-**文件**：`/home/ubuntu/.hermes/agents/pantalone.md`
+**文件**：宿主 `$HERMES_HOME/agents/pantalone.md`
 
 - 主责增加「美股」
 - 能力表增加一行：`美股分析 | 指数/行业轮动/OCIFQ选股/深度研究`
