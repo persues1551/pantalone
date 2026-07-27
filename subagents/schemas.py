@@ -858,10 +858,10 @@ class USMarketDataReport(BaseModel):
     dxy: dict[str, Any] = Field(default_factory=dict)
     tnx: dict[str, Any] = Field(default_factory=dict)
     sector_rotation: SectorRotation = Field(default_factory=SectorRotation)
-    market_regime: str = "neutral"  # risk_on / risk_off / neutral
+    market_regime: str = Field(default="unknown", pattern="^(risk_on|risk_off|neutral|unknown)$")
     position_advice: str = ""
     leveraged_signal: LeveragedETFSignal = Field(default_factory=LeveragedETFSignal)
-    data_quality: DataQuality = DataQuality.B
+    data_quality: DataQuality = DataQuality.D
     data_date: str = ""
     errors: list[str] = Field(default_factory=list)
 
@@ -931,8 +931,17 @@ class USFinancialReport(BaseModel):
     ocifq: OCIQFResult = Field(default_factory=OCIQFResult)
     accounting_notes: str = ""
     data_sources: list[str] = Field(default_factory=list)
-    data_quality: DataQuality = DataQuality.B
+    data_quality: DataQuality = DataQuality.D
     errors: list[str] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def enforce_financial_evidence(self) -> "USFinancialReport":
+        if not self.data_sources:
+            if self.financial_score != 0 or self.data_quality != DataQuality.D:
+                raise ValueError("missing financial sources requires score 0 and data quality D")
+        elif self.data_quality == DataQuality.D and self.financial_score > 0:
+            raise ValueError("data quality D cannot carry a positive financial score")
+        return self
 
 
 class RiskCheckResult(BaseModel):
@@ -944,12 +953,32 @@ class RiskCheckResult(BaseModel):
 class USRiskReport(BaseModel):
     """US stock risk screening report."""
     ticker: str
-    overall_risk: str = Field(default="medium", pattern="^(low|medium|high|critical|unknown)$")
-    risk_score: int = Field(default=50, ge=0, le=100)  # higher = safer
+    overall_risk: str = Field(default="unknown", pattern="^(low|medium|high|critical|unknown)$")
+    risk_score: int = Field(default=0, ge=0, le=100)  # higher = safer
     checks: dict[str, RiskCheckResult] = Field(default_factory=dict)
     critical_alerts: list[str] = Field(default_factory=list)
     warnings: list[str] = Field(default_factory=list)
     risk_bias: str = ""
     data_sources: list[str] = Field(default_factory=list)
-    data_quality: DataQuality = DataQuality.B
+    data_quality: DataQuality = DataQuality.D
     errors: list[str] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def enforce_risk_evidence(self) -> "USRiskReport":
+        required_checks = {
+            "delisting",
+            "litigation",
+            "insider_selling",
+            "goodwill",
+            "debt",
+            "customer_concentration",
+            "regulatory",
+            "accounting",
+        }
+        evidence_complete = required_checks.issubset(self.checks) and bool(self.data_sources)
+        if not evidence_complete:
+            if self.overall_risk != "unknown" or self.risk_score != 0 or self.data_quality != DataQuality.D:
+                raise ValueError("incomplete risk evidence requires unknown risk, score 0, and data quality D")
+        elif self.data_quality == DataQuality.D and self.risk_score > 0:
+            raise ValueError("data quality D cannot carry a positive risk score")
+        return self

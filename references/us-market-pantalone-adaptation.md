@@ -55,7 +55,7 @@
 美股任务在 Pantalone 框架内的分发逻辑：
 
 1. **用户问美股大盘/外围** → `us_market_data.md` + `../amadeus-us-market/SKILL.md`（速览模式）
-2. **用户问美股个股深度研究** → `us_market_data.md` → `us_financial.md` → `us_risk.md` → summary（完整8阶段简化为3阶段）
+2. **用户问美股个股深度研究** → 执行 `workflow_v4_unified.md` 完整8阶段；`us_market_data.md`、`us_financial.md`、`us_risk.md` 只承担其中的数据、财务和专属风险子任务，不得替代主力行为、OCIFQ、多空辩论、合规、策略和最终决策阶段
 3. **用户问美股建仓/筛选** → `../amadeus-us-market/references/us-market-screening-and-entry.md`（9步全流程）
 4. **用户问美股非科技板块** → `../amadeus-us-market/references/us-non-tech-sector-screening.md`
 5. **用户问A股受美股影响** → `amadeus-us-market` 7步传导分析

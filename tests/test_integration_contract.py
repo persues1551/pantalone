@@ -454,6 +454,26 @@ def test_us_models_do_not_share_mutable_defaults():
     assert second.data_sources == []
     assert second.peer_comparison == []
 
+    with pytest.raises(ValueError, match="missing financial sources"):
+        m.USFinancialReport(ticker="NVDA", financial_score=80, data_quality="A")
+
+    empty_financial = m.USFinancialReport(ticker="NVDA")
+    assert empty_financial.financial_score == 0
+    assert empty_financial.data_quality.value == "D"
+
+    complete_financial = m.USFinancialReport(
+        ticker="NVDA", financial_score=80, data_sources=["SEC EDGAR"], data_quality="A"
+    )
+    assert complete_financial.financial_score == 80
+
+    with pytest.raises(ValueError, match="incomplete risk evidence"):
+        m.USRiskReport(ticker="NVDA", overall_risk="low", risk_score=90, data_quality="A")
+
+    empty_risk = m.USRiskReport(ticker="NVDA")
+    assert empty_risk.overall_risk == "unknown"
+    assert empty_risk.risk_score == 0
+    assert empty_risk.data_quality.value == "D"
+
     risk_a = m.USRiskReport(ticker="AAA")
     risk_b = m.USRiskReport(ticker="BBB")
     risk_a.warnings.append("test")
