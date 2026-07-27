@@ -258,9 +258,28 @@ def test_us_leveraged_signal_fails_closed_and_bounds_exposure():
             ],
         )
 
+    with pytest.raises(ValueError, match="complete inputs"):
+        m.LeveragedETFSignal(direction="long")
+
+    with pytest.raises(ValueError, match="inverse products"):
+        m.LeveragedETFSignal(
+            direction="long",
+            inputs_complete=True,
+            recommended=[
+                {
+                    "ticker": "SQQQ",
+                    "leverage": 3,
+                    "position_pct": 3,
+                    "stop_loss": -5,
+                    "max_hold_days": 2,
+                }
+            ],
+        )
+
     with pytest.raises(ValueError, match="notional exposure"):
         m.LeveragedETFSignal(
             direction="long",
+            inputs_complete=True,
             recommended=[
                 {
                     "ticker": "TQQQ",

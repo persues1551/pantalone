@@ -96,6 +96,7 @@ delegate_task(
   "position_advice": "正常建仓",
   "leveraged_signal": {
     "direction": "long",
+    "inputs_complete": true,
     "vix_level": "low",
     "recommended": [{"ticker": "TQQQ", "leverage": 3, "position_pct": 5, "stop_loss": -5, "max_hold_days": 5}],
     "not_recommended": [],

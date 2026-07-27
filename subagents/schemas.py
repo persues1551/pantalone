@@ -766,6 +766,7 @@ class LeveragedETFSignal(BaseModel):
     """Tactical signal that must allow the fail-closed avoid outcome."""
 
     direction: str = Field(default="avoid", pattern="^(long|inverse|avoid)$")
+    inputs_complete: bool = False
     vix_level: str = "unknown"
     recommended: list[LeveragedETFPosition] = Field(default_factory=list)
     not_recommended: list[str] = Field(default_factory=list)
@@ -775,6 +776,15 @@ class LeveragedETFSignal(BaseModel):
     def enforce_avoid_and_exposure(self) -> "LeveragedETFSignal":
         if self.direction == "avoid" and self.recommended:
             raise ValueError("avoid direction cannot recommend leveraged positions")
+        if self.direction != "avoid" and not self.inputs_complete:
+            raise ValueError("directional leveraged signal requires complete inputs")
+        bull = {"TQQQ", "UPRO", "SPXL", "SOXL", "TECL", "FNGU", "UDOW", "QLD", "SSO"}
+        inverse = {"SQQQ", "SPXU", "SOXS", "TECS", "FNGD", "SDOW", "QID", "SDS"}
+        tickers = {item.ticker.upper() for item in self.recommended}
+        if self.direction == "long" and tickers & inverse:
+            raise ValueError("long direction cannot recommend inverse products")
+        if self.direction == "inverse" and tickers & bull:
+            raise ValueError("inverse direction cannot recommend bull products")
         exposure = sum(item.position_pct * item.leverage / 100 for item in self.recommended)
         if exposure > 0.5:
             raise ValueError("recommended leveraged notional exposure must be <= 0.5")
