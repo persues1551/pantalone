@@ -454,15 +454,45 @@ def test_us_models_do_not_share_mutable_defaults():
     assert second.data_sources == []
     assert second.peer_comparison == []
 
-    with pytest.raises(ValueError, match="missing financial sources"):
+def test_us_evidence_models_fail_closed_across_fields():
+    m = load_schemas()
+
+    with pytest.raises(ValueError, match="incomplete market evidence"):
+        m.USMarketDataReport(indices={}, market_regime="risk_on", data_quality="A")
+
+    empty_market = m.USMarketDataReport(indices={})
+    assert empty_market.market_regime == "unknown"
+    assert empty_market.data_quality.value == "D"
+
+    with pytest.raises(ValueError, match="incomplete financial evidence"):
         m.USFinancialReport(ticker="NVDA", financial_score=80, data_quality="A")
 
     empty_financial = m.USFinancialReport(ticker="NVDA")
     assert empty_financial.financial_score == 0
     assert empty_financial.data_quality.value == "D"
 
+    with pytest.raises(ValueError, match="incomplete financial evidence"):
+        m.USFinancialReport(
+            ticker="NVDA", financial_score=80, data_sources=["SEC EDGAR"], data_quality="A"
+        )
+
     complete_financial = m.USFinancialReport(
-        ticker="NVDA", financial_score=80, data_sources=["SEC EDGAR"], data_quality="A"
+        ticker="NVDA",
+        financial_score=80,
+        valuation={"forward_pe": 30},
+        growth={"revenue_yoy": "+20%"},
+        profitability={"roe": 30},
+        balance_sheet={"cash_to_debt": 2},
+        peer_comparison=[{"ticker": "AMD"}],
+        ocifq={
+            "oligopoly": "verified",
+            "catalyst": "verified",
+            "industry_moat": "verified",
+            "financial_blast": "verified",
+            "quarterly_continuity": "verified",
+        },
+        data_sources=["SEC EDGAR", "yfinance"],
+        data_quality="A",
     )
     assert complete_financial.financial_score == 80
 
@@ -473,6 +503,38 @@ def test_us_models_do_not_share_mutable_defaults():
     assert empty_risk.overall_risk == "unknown"
     assert empty_risk.risk_score == 0
     assert empty_risk.data_quality.value == "D"
+
+    unknown_checks = {
+        key: {"status": "unknown", "detail": "not verified"}
+        for key in (
+            "delisting", "litigation", "insider_selling", "goodwill",
+            "debt", "customer_concentration", "regulatory", "accounting",
+        )
+    }
+    with pytest.raises(ValueError, match="incomplete risk evidence"):
+        m.USRiskReport(
+            ticker="NVDA", overall_risk="low", risk_score=100,
+            checks=unknown_checks, data_sources=["SEC EDGAR"], data_quality="A"
+        )
+
+    pass_checks = {
+        key: {"status": "pass", "detail": "verified"}
+        for key in unknown_checks
+    }
+    with pytest.raises(ValueError, match="critical alerts"):
+        m.USRiskReport(
+            ticker="NVDA", overall_risk="low", risk_score=100,
+            checks=pass_checks, critical_alerts=["SEC fraud action"],
+            data_sources=["SEC EDGAR"], data_quality="A"
+        )
+
+    fail_checks = dict(pass_checks)
+    fail_checks["litigation"] = {"status": "fail", "detail": "material fraud case"}
+    with pytest.raises(ValueError, match="failed risk checks"):
+        m.USRiskReport(
+            ticker="NVDA", overall_risk="low", risk_score=90,
+            checks=fail_checks, data_sources=["SEC EDGAR"], data_quality="A"
+        )
 
     risk_a = m.USRiskReport(ticker="AAA")
     risk_b = m.USRiskReport(ticker="BBB")

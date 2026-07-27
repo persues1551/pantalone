@@ -868,6 +868,32 @@ class USMarketDataReport(BaseModel):
     data_date: str = ""
     errors: list[str] = Field(default_factory=list)
 
+    @model_validator(mode="after")
+    def enforce_market_evidence(self) -> "USMarketDataReport":
+        required_indices = {"^GSPC", "^IXIC", "^DJI", "^RUT"}
+        evidence_complete = (
+            required_indices.issubset(self.indices)
+            and bool(self.vix)
+            and bool(self.dxy)
+            and bool(self.tnx)
+            and bool(self.data_date.strip())
+        )
+        carries_conclusion = (
+            self.market_regime != "unknown"
+            or bool(self.position_advice.strip())
+            or self.leveraged_signal.direction != "avoid"
+            or self.data_quality != DataQuality.D
+        )
+        if not evidence_complete and carries_conclusion:
+            raise ValueError(
+                "incomplete market evidence requires unknown regime, empty advice, avoid signal, and data quality D"
+            )
+        if self.data_quality == DataQuality.D and (
+            self.market_regime != "unknown" or self.leveraged_signal.direction != "avoid"
+        ):
+            raise ValueError("data quality D cannot carry a directional market conclusion")
+        return self
+
 
 class ValuationMetrics(BaseModel):
     """US stock valuation."""
@@ -939,9 +965,28 @@ class USFinancialReport(BaseModel):
 
     @model_validator(mode="after")
     def enforce_financial_evidence(self) -> "USFinancialReport":
-        if not self.data_sources:
+        valuation_evidence = any(value is not None for value in self.valuation.model_dump().values())
+        growth_evidence = any(
+            bool(value.strip()) if isinstance(value, str) else value > 0
+            for value in self.growth.model_dump().values()
+        )
+        profitability_evidence = any(value is not None for value in self.profitability.model_dump().values())
+        balance_evidence = any(value is not None for value in self.balance_sheet.model_dump().values())
+        ocifq_complete = all(bool(value.strip()) for value in self.ocifq.model_dump().values())
+        evidence_complete = all(
+            (
+                self.data_sources,
+                valuation_evidence,
+                growth_evidence,
+                profitability_evidence,
+                balance_evidence,
+                self.peer_comparison,
+                ocifq_complete,
+            )
+        )
+        if not evidence_complete:
             if self.financial_score != 0 or self.data_quality != DataQuality.D:
-                raise ValueError("missing financial sources requires score 0 and data quality D")
+                raise ValueError("incomplete financial evidence requires score 0 and data quality D")
         elif self.data_quality == DataQuality.D and self.financial_score > 0:
             raise ValueError("data quality D cannot carry a positive financial score")
         return self
@@ -978,10 +1023,26 @@ class USRiskReport(BaseModel):
             "regulatory",
             "accounting",
         }
-        evidence_complete = required_checks.issubset(self.checks) and bool(self.data_sources)
+        required_results = [self.checks[key] for key in required_checks if key in self.checks]
+        evidence_complete = (
+            len(required_results) == len(required_checks)
+            and bool(self.data_sources)
+            and all(result.status != "unknown" and bool(result.detail.strip()) for result in required_results)
+        )
         if not evidence_complete:
             if self.overall_risk != "unknown" or self.risk_score != 0 or self.data_quality != DataQuality.D:
                 raise ValueError("incomplete risk evidence requires unknown risk, score 0, and data quality D")
-        elif self.data_quality == DataQuality.D and self.risk_score > 0:
+            return self
+        statuses = {result.status for result in required_results}
+        if self.critical_alerts:
+            if self.overall_risk != "critical" or self.risk_score > 20:
+                raise ValueError("critical alerts require critical risk and score <= 20")
+        elif "fail" in statuses:
+            if self.overall_risk not in {"high", "critical"} or self.risk_score > 40:
+                raise ValueError("failed risk checks require high or critical risk and score <= 40")
+        elif "warn" in statuses:
+            if self.overall_risk == "low" or self.risk_score > 75:
+                raise ValueError("warning risk checks cannot produce low risk or score > 75")
+        if self.data_quality == DataQuality.D and self.risk_score > 0:
             raise ValueError("data quality D cannot carry a positive risk score")
         return self
