@@ -460,6 +460,23 @@ def test_us_evidence_models_fail_closed_across_fields():
     with pytest.raises(ValueError, match="incomplete market evidence"):
         m.USMarketDataReport(indices={}, market_regime="risk_on", data_quality="A")
 
+    valid_index = {
+        "price": 100,
+        "5d_return": 1,
+        "1m_return": 2,
+        "3m_return": 3,
+        "52w_high_drawdown": -4,
+        "above_50ma": True,
+        "above_200ma": True,
+        "volatility_60d": 15,
+    }
+    with pytest.raises(ValueError, match="risk_on requires VIX below 25"):
+        m.USMarketDataReport(
+            indices={key: valid_index for key in ("^GSPC", "^IXIC", "^DJI", "^RUT")},
+            vix={"value": 35}, dxy={"value": 104}, tnx={"value": 4.2},
+            data_date="2026-07-27", market_regime="risk_on", data_quality="A",
+        )
+
     empty_market = m.USMarketDataReport(indices={})
     assert empty_market.market_regime == "unknown"
     assert empty_market.data_quality.value == "D"
@@ -559,6 +576,19 @@ def test_us_evidence_models_fail_closed_across_fields():
             ticker="NVDA", overall_risk="low", risk_score=100,
             checks=pass_checks, critical_alerts=["SEC fraud action"],
             data_sources=["SEC EDGAR", "yfinance"], data_quality="A"
+        )
+
+    with pytest.raises(ValueError, match="warnings cannot produce low risk"):
+        m.USRiskReport(
+            ticker="NVDA", overall_risk="low", risk_score=100,
+            checks=pass_checks, warnings=["material concentration warning"],
+            data_sources=["SEC EDGAR", "yfinance"], data_quality="A"
+        )
+
+    with pytest.raises(ValueError, match="risk score must match"):
+        m.USRiskReport(
+            ticker="NVDA", overall_risk="low", risk_score=10,
+            checks=pass_checks, data_sources=["SEC EDGAR", "yfinance"], data_quality="A"
         )
 
     fail_checks = dict(pass_checks)

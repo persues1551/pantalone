@@ -10,6 +10,7 @@ from __future__ import annotations
 from datetime import date
 from enum import Enum
 import math
+import re
 from typing import Any, Dict, List, Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -754,6 +755,10 @@ def _finite_number(value: Any) -> bool:
     return isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value)
 
 
+def _percentage_evidence(value: str) -> bool:
+    return _meaningful_text(value) and bool(re.search(r"[-+]?\d+(?:\.\d+)?\s*%", value))
+
+
 class IndexData(BaseModel):
     """Single index data point."""
 
@@ -930,6 +935,21 @@ class USMarketDataReport(BaseModel):
             self.market_regime != "unknown" or self.leveraged_signal.direction != "avoid"
         ):
             raise ValueError("data quality D cannot carry a directional market conclusion")
+        if evidence_complete:
+            actual_vix = float(self.vix["value"])
+            index_rows = [self.indices[key] for key in required_indices]
+            above_50 = sum(row.above_50ma for row in index_rows)
+            above_200 = sum(row.above_200ma for row in index_rows)
+            if self.market_regime == "risk_on" and not (actual_vix < 25 and above_50 >= 3 and above_200 >= 3):
+                raise ValueError("risk_on requires VIX below 25 and broad index trend confirmation")
+            if self.leveraged_signal.direction != "avoid":
+                signal_vix = self.leveraged_signal.vix_value
+                if signal_vix is None or abs(signal_vix - actual_vix) > 0.01:
+                    raise ValueError("leveraged signal VIX must match market VIX")
+                if self.leveraged_signal.direction == "long" and self.market_regime != "risk_on":
+                    raise ValueError("long leveraged signal requires risk_on market regime")
+                if self.leveraged_signal.direction == "inverse" and self.market_regime != "risk_off":
+                    raise ValueError("inverse leveraged signal requires risk_off market regime")
         return self
 
 
@@ -1005,7 +1025,7 @@ class USFinancialReport(BaseModel):
     def enforce_financial_evidence(self) -> "USFinancialReport":
         valuation_evidence = sum(_finite_number(value) for value in self.valuation.model_dump().values()) >= 2
         growth_evidence = sum(
-            _meaningful_text(value) if isinstance(value, str) else _finite_number(value) and value > 0
+            _percentage_evidence(value) if isinstance(value, str) else _finite_number(value) and value > 0
             for value in self.growth.model_dump().values()
         ) >= 2
         profitability_evidence = sum(_finite_number(value) for value in self.profitability.model_dump().values()) >= 2
@@ -1090,6 +1110,18 @@ class USRiskReport(BaseModel):
         elif "warn" in statuses:
             if self.overall_risk == "low" or self.risk_score > 75:
                 raise ValueError("warning risk checks cannot produce low risk or score > 75")
+        if self.warnings and (self.overall_risk == "low" or self.risk_score > 75):
+            raise ValueError("warnings cannot produce low risk or score > 75")
+        score_ranges = {
+            "critical": (0, 20),
+            "high": (0, 40),
+            "medium": (41, 75),
+            "low": (76, 100),
+        }
+        if self.overall_risk in score_ranges:
+            lower, upper = score_ranges[self.overall_risk]
+            if not lower <= self.risk_score <= upper:
+                raise ValueError("risk score must match overall risk severity")
         if self.data_quality == DataQuality.D and self.risk_score > 0:
             raise ValueError("data quality D cannot carry a positive risk score")
         return self
