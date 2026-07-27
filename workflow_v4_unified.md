@@ -1,4 +1,4 @@
-# Pantalone v5.1 统一工作流
+# Pantalone v5.2 统一工作流
 
 > 状态：三Agent架构下的投研流程契约
 
@@ -71,6 +71,8 @@ Pantalone只负责投资研究：市场、个股、ETF、多资产、OCIFQ、观
 |---|---|
 | 盘前/午盘/收盘 | `subagents/market_data.md` + 对应模板 |
 | 个股深研 | financial + technical + capital + risk + review |
+| 美股个股深研 | 完整8阶段；Stage 1加载`us_market_data.md`，Stage 3加载`us_financial.md`，Stage 5加载`us_risk.md`；不得用三子任务替代其余阶段 |
+| 美股市场/外围速览 | `subagents/us_market_data.md`；仅在用户明确要求速览时，不冒充个股完整研究 |
 | ETF | `subagents/etf.md` + `subagents/etf_reviewer.md` |
 | 宏观/多资产 | `subagents/macro.md` |
 | 板块/题材 | `subagents/theme.md` + `references/sector-screening-workflow.md` |
@@ -115,7 +117,7 @@ Pantalone只负责投资研究：市场、个股、ETF、多资产、OCIFQ、观
 
 ## 八、结构化输出与Review
 
-`subagents/schemas.py`定义市场、技术、财务、题材、宏观、风险、资金和Review的数据契约。Schema用于约束跨Agent输出，不表示Hermes会自动执行Pydantic转换。
+`subagents/schemas.py`定义市场、技术、财务、题材、宏观、风险、资金、Review以及`USMarketDataReport`、`USFinancialReport`、`USRiskReport`的数据契约。Schema用于约束跨Agent输出，不表示Hermes会自动执行Pydantic转换。
 
 Review必须检查：
 

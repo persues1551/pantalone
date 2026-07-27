@@ -474,6 +474,7 @@ def test_us_evidence_models_fail_closed_across_fields():
         m.USMarketDataReport(
             indices={key: valid_index for key in ("^GSPC", "^IXIC", "^DJI", "^RUT")},
             vix={"value": 35}, dxy={"value": 104}, tnx={"value": 4.2},
+            sector_rotation={"weakening": ["XLK"]},
             data_date="2026-07-27", market_regime="risk_on", data_quality="A",
         )
 
@@ -535,11 +536,11 @@ def test_us_evidence_models_fail_closed_across_fields():
         balance_sheet={"cash_to_debt": 2, "current_ratio": 1.8},
         peer_comparison=[{"ticker": "AMD", "forward_pe": 25}],
         ocifq={
-            "oligopoly": "market share evidence verified",
-            "catalyst": "multi-year demand catalyst verified",
-            "industry_moat": "margin advantage versus peers verified",
-            "financial_blast": "revenue EPS and FCF growth verified",
-            "quarterly_continuity": "four consecutive quarters verified",
+            "oligopoly": "market share data supports durable leadership",
+            "catalyst": "multi-year demand growth supported by filings",
+            "industry_moat": "peer margins show persistent operating advantage",
+            "financial_blast": "revenue +20%, EPS +25%, and FCF +18%",
+            "quarterly_continuity": "four consecutive quarters beat consensus",
         },
         data_sources=["SEC EDGAR", "yfinance"],
         data_quality="A",
@@ -585,7 +586,7 @@ def test_us_evidence_models_fail_closed_across_fields():
             data_sources=["SEC EDGAR", "yfinance"], data_quality="A"
         )
 
-    with pytest.raises(ValueError, match="risk score must match"):
+    with pytest.raises(ValueError, match="all-pass risk checks"):
         m.USRiskReport(
             ticker="NVDA", overall_risk="low", risk_score=10,
             checks=pass_checks, data_sources=["SEC EDGAR", "yfinance"], data_quality="A"

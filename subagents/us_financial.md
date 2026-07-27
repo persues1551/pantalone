@@ -50,6 +50,8 @@ delegate_task(
 
 ## 输出格式（必须遵守）
 
+下列数字仅为 Schema 形状示例，不是当前 NVDA 财务事实；实际执行必须重新读取 SEC EDGAR、yfinance/FMP 并写明 `as_of` 或数据日期。
+
 ```json
 {
   "ticker": "NVDA",

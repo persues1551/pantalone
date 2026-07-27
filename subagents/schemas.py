@@ -743,12 +743,12 @@ def _meaningful_text(value: str, *, min_length: int = 4) -> bool:
 
 def _recognized_source(value: str) -> bool:
     normalized = value.strip().lower()
-    markers = (
-        "sec", "edgar", "yfinance", "financial modeling prep", "fmp",
-        "finra", "cftc", "fred", "nasdaq", "nyse", "investor relations",
-        "company filing", "official", "http://", "https://",
-    )
-    return _meaningful_text(value, min_length=3) and any(marker in normalized for marker in markers)
+    allowed = {
+        "sec", "sec edgar", "yfinance", "financial modeling prep", "fmp",
+        "finra", "cftc", "fred", "nasdaq", "nyse", "company investor relations",
+        "company 10-k", "company 10-q", "company 8-k", "official company filing",
+    }
+    return normalized in allowed
 
 
 def _finite_number(value: Any) -> bool:
@@ -915,6 +915,19 @@ class USMarketDataReport(BaseModel):
 
         evidence_complete = (
             required_indices.issubset(self.indices)
+            and all(
+                any(
+                    abs(value) > 1e-9
+                    for value in (
+                        row.five_day_return,
+                        row.one_month_return,
+                        row.three_month_return,
+                        row.fifty_two_week_high_drawdown,
+                    )
+                )
+                for row in self.indices.values()
+            )
+            and any(self.sector_rotation.model_dump().values())
             and positive_payload(self.vix)
             and positive_payload(self.dxy)
             and positive_payload(self.tnx)
@@ -942,6 +955,11 @@ class USMarketDataReport(BaseModel):
             above_200 = sum(row.above_200ma for row in index_rows)
             if self.market_regime == "risk_on" and not (actual_vix < 25 and above_50 >= 3 and above_200 >= 3):
                 raise ValueError("risk_on requires VIX below 25 and broad index trend confirmation")
+            if self.market_regime == "risk_off" and not (actual_vix >= 20 and above_50 <= 1 and above_200 <= 1):
+                raise ValueError("risk_off requires VIX at least 20 and broad index weakness")
+            action_terms = ("满仓", "买入", "建仓", "加仓", "卖出", "清仓", "all-in")
+            if any(term in self.position_advice.lower() for term in action_terms):
+                raise ValueError("position_advice must not contain direct trade instructions")
             if self.leveraged_signal.direction != "avoid":
                 signal_vix = self.leveraged_signal.vix_value
                 if signal_vix is None or abs(signal_vix - actual_vix) > 0.01:
@@ -1023,19 +1041,31 @@ class USFinancialReport(BaseModel):
 
     @model_validator(mode="after")
     def enforce_financial_evidence(self) -> "USFinancialReport":
-        valuation_evidence = sum(_finite_number(value) for value in self.valuation.model_dump().values()) >= 2
+        valuation_evidence = sum(_finite_number(value) and abs(value) > 1e-12 for value in self.valuation.model_dump().values()) >= 2
         growth_evidence = sum(
             _percentage_evidence(value) if isinstance(value, str) else _finite_number(value) and value > 0
             for value in self.growth.model_dump().values()
         ) >= 2
-        profitability_evidence = sum(_finite_number(value) for value in self.profitability.model_dump().values()) >= 2
-        balance_evidence = sum(_finite_number(value) for value in self.balance_sheet.model_dump().values()) >= 2
+        profitability_evidence = sum(
+            _finite_number(value) and abs(value) > 1e-12 for value in self.profitability.model_dump().values()
+        ) >= 2
+        balance_evidence = sum(
+            _finite_number(value) and abs(value) > 1e-12 for value in self.balance_sheet.model_dump().values()
+        ) >= 2
         peer_evidence = any(
             _meaningful_text(peer.ticker, min_length=1)
-            and any(_finite_number(value) for key, value in peer.model_dump().items() if key != "ticker")
+            and any(
+                _finite_number(value) and abs(value) > 1e-12
+                for key, value in peer.model_dump().items() if key != "ticker"
+            )
             for peer in self.peer_comparison
         )
-        ocifq_complete = all(_meaningful_text(value, min_length=8) for value in self.ocifq.model_dump().values())
+        forbidden_evidence = ("fabricated", "placeholder", "lorem", "rumor", "gossip", "示例", "占位")
+        ocifq_complete = all(
+            _meaningful_text(value, min_length=20)
+            and not any(term in value.lower() for term in forbidden_evidence)
+            for value in self.ocifq.model_dump().values()
+        )
         sources_complete = len({source.strip().lower() for source in self.data_sources if _recognized_source(source)}) >= 2
         evidence_complete = all(
             (
@@ -1096,20 +1126,31 @@ class USRiskReport(BaseModel):
                 for result in required_results
             )
         )
-        if not evidence_complete:
-            if self.overall_risk != "unknown" or self.risk_score != 0 or self.data_quality != DataQuality.D:
-                raise ValueError("incomplete risk evidence requires unknown risk, score 0, and data quality D")
-            return self
-        statuses = {result.status for result in required_results}
+        alert_text_valid = all(_meaningful_text(item, min_length=12) for item in self.critical_alerts)
+        warning_text_valid = all(_meaningful_text(item, min_length=12) for item in self.warnings)
+        if self.critical_alerts and not alert_text_valid:
+            raise ValueError("critical alerts require meaningful evidence text")
+        if self.warnings and not warning_text_valid:
+            raise ValueError("warnings require meaningful evidence text")
         if self.critical_alerts:
             if self.overall_risk != "critical" or self.risk_score > 20:
                 raise ValueError("critical alerts require critical risk and score <= 20")
-        elif "fail" in statuses:
+            return self
+        if not evidence_complete:
+            if self.overall_risk != "unknown" or self.risk_score != 0 or self.data_quality != DataQuality.D:
+                raise ValueError("incomplete risk evidence requires unknown risk, score 0, and data quality D")
+            if self.warnings:
+                raise ValueError("incomplete risk evidence cannot carry warnings")
+            return self
+        statuses = {result.status for result in required_results}
+        if "fail" in statuses:
             if self.overall_risk not in {"high", "critical"} or self.risk_score > 40:
                 raise ValueError("failed risk checks require high or critical risk and score <= 40")
         elif "warn" in statuses:
             if self.overall_risk == "low" or self.risk_score > 75:
                 raise ValueError("warning risk checks cannot produce low risk or score > 75")
+        elif not self.warnings and (self.overall_risk != "low" or self.risk_score < 76):
+            raise ValueError("all-pass risk checks without warnings require low risk and score >= 76")
         if self.warnings and (self.overall_risk == "low" or self.risk_score > 75):
             raise ValueError("warnings cannot produce low risk or score > 75")
         score_ranges = {

@@ -50,6 +50,8 @@ delegate_task(
 
 ## 输出格式（必须遵守）
 
+下列数字和状态仅为 Schema 形状示例，不是当前 NVDA 风险事实；实际执行必须重新核验 SEC、公司公告及实时公开来源。
+
 ```json
 {
   "ticker": "NVDA",

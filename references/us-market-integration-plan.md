@@ -4,10 +4,9 @@
 
 ## 现状
 
-`amadeus-us-market` skill 已有扎实的美股分析基础，但作为独立「外围市场参考」运行，
-未集成到 Pantalone 的四层框架、8阶段研究和 subagent 体系。
+`amadeus-us-market` skill 保持独立外围速览能力；当前 v5.2 已将美股专属市场、财务和风险子任务接入 Pantalone 的四层框架与完整8阶段研究。
 
-## 缺口清单（5项）
+## 已实施清单（5项）
 
 ### 1. Agent 定义更新
 **文件**：宿主 `$HERMES_HOME/agents/pantalone.md`
@@ -24,7 +23,7 @@
 
 ### 3. 新增美股 Subagent（2-3个）
 
-Pantalone 现有 9 个 subagent 全为 A股设计。需要：
+在原有专业角色外已增加：
 
 | 新 Subagent | 职责 | 数据源 |
 |-------------|------|--------|
