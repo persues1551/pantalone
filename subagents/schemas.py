@@ -761,12 +761,53 @@ class LeveragedETFPosition(BaseModel):
     stop_loss: float = Field(lt=0, ge=-8)
     max_hold_days: int = Field(gt=0, le=8)
 
+    @model_validator(mode="after")
+    def enforce_product_contract(self) -> "LeveragedETFPosition":
+        expected_leverage = {
+            "TQQQ": 3.0,
+            "UPRO": 3.0,
+            "SPXL": 3.0,
+            "SOXL": 3.0,
+            "TECL": 3.0,
+            "UDOW": 3.0,
+            "SQQQ": 3.0,
+            "SPXU": 3.0,
+            "SOXS": 3.0,
+            "TECS": 3.0,
+            "SDOW": 3.0,
+            "QLD": 2.0,
+            "SSO": 2.0,
+            "QID": 2.0,
+            "SDS": 2.0,
+        }
+        ticker = self.ticker.upper()
+        expected = expected_leverage.get(ticker)
+        if expected is None:
+            raise ValueError("unsupported leveraged ETF ticker")
+        if self.leverage != expected:
+            raise ValueError(f"{ticker} must use its {expected:g}x target leverage")
+        max_hold = 5 if expected == 3 else 8
+        if self.max_hold_days > max_hold:
+            raise ValueError(f"{ticker} max_hold_days must be <= {max_hold}")
+        if self.stop_loss > -3.0:
+            raise ValueError("stop_loss must cap loss by at least 3 percent")
+        maximum_loss = -5.0 if expected == 3 else -4.0
+        if self.stop_loss < maximum_loss:
+            raise ValueError(f"{ticker} stop_loss cannot be looser than {maximum_loss:g} percent")
+        self.ticker = ticker
+        return self
+
 
 class LeveragedETFSignal(BaseModel):
     """Tactical signal that must allow the fail-closed avoid outcome."""
 
     direction: str = Field(default="avoid", pattern="^(long|inverse|avoid)$")
     inputs_complete: bool = False
+    trend_confirmed: bool = False
+    momentum_confirmed: bool = False
+    liquidity_confirmed: bool = False
+    volatility_confirmed: bool = False
+    vix_value: Optional[float] = Field(default=None, ge=0)
     vix_level: str = "unknown"
     recommended: list[LeveragedETFPosition] = Field(default_factory=list)
     not_recommended: list[str] = Field(default_factory=list)
@@ -776,11 +817,30 @@ class LeveragedETFSignal(BaseModel):
     def enforce_avoid_and_exposure(self) -> "LeveragedETFSignal":
         if self.direction == "avoid" and self.recommended:
             raise ValueError("avoid direction cannot recommend leveraged positions")
-        if self.direction != "avoid" and not self.inputs_complete:
-            raise ValueError("directional leveraged signal requires complete inputs")
-        bull = {"TQQQ", "UPRO", "SPXL", "SOXL", "TECL", "FNGU", "UDOW", "QLD", "SSO"}
-        inverse = {"SQQQ", "SPXU", "SOXS", "TECS", "FNGD", "SDOW", "QID", "SDS"}
-        tickers = {item.ticker.upper() for item in self.recommended}
+        if self.direction != "avoid" and not self.recommended:
+            raise ValueError("directional leveraged signal requires at least one supported product")
+        confirmations = (
+            self.inputs_complete,
+            self.trend_confirmed,
+            self.momentum_confirmed,
+            self.liquidity_confirmed,
+            self.volatility_confirmed,
+        )
+        if self.direction != "avoid" and not all(confirmations):
+            raise ValueError("directional leveraged signal requires complete confirmed inputs")
+        if self.direction != "avoid":
+            if self.vix_value is None:
+                raise ValueError("directional leveraged signal requires a current VIX value")
+            vix_value = self.vix_value
+            if vix_value > 30:
+                raise ValueError("VIX above 30 requires avoid direction")
+            if self.direction == "long" and vix_value >= 25:
+                raise ValueError("long leveraged signal requires VIX below 25")
+            if self.direction == "inverse" and not 25 <= vix_value <= 30:
+                raise ValueError("inverse leveraged signal requires VIX between 25 and 30")
+        bull = {"TQQQ", "UPRO", "SPXL", "SOXL", "TECL", "UDOW", "QLD", "SSO"}
+        inverse = {"SQQQ", "SPXU", "SOXS", "TECS", "SDOW", "QID", "SDS"}
+        tickers = {item.ticker for item in self.recommended}
         if self.direction == "long" and tickers & inverse:
             raise ValueError("long direction cannot recommend inverse products")
         if self.direction == "inverse" and tickers & bull:

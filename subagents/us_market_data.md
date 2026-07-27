@@ -43,11 +43,11 @@ delegate_task(
 
 ```
 1. VIX 水平
-   ├─ <15 → 3x 可用，损耗低
-   ├─ 15-20 → 3x 可用，收紧止损
-   ├─ 20-25 → 降级 2x 或减仓
-   ├─ 25-30 → 仅 2x 做多，做空开始关注
-   └─ >30 → 禁止做多杠杆，做空可用但仓位减半
+   ├─ <15 → 仅在其余确认项完整时研究 3x 候选
+   ├─ 15-20 → 可研究 2x/3x，收紧仓位与退出条件
+   ├─ 20-25 → 默认降级 2x 或 avoid
+   ├─ 25-30 → 默认 avoid；反向产品仍需全部确认项
+   └─ >30 → 默认 avoid，不根据 VIX 单独给出任何方向
 
 2. 指数趋势（以纳指为主，标普确认为辅）
    ├─ >20MA 且 MACD 多头 → 做多信号
@@ -56,7 +56,7 @@ delegate_task(
 
 3. 输出推荐
    ├─ 做多信号 + VIX<25 → TQQQ/UPRO/SOXL（按波动匹配）
-   ├─ 做空信号 + VIX>25 → SQQQ/SPXU（严格控制仓位）
+   ├─ 做空信号 + VIX 25-30 + 趋势/动量/广度/流动性全确认 → SQQQ/SPXU候选
    └─ 信号矛盾或VIX 20-25 → 不做或降级 2x
 ```
 
@@ -97,6 +97,11 @@ delegate_task(
   "leveraged_signal": {
     "direction": "long",
     "inputs_complete": true,
+    "trend_confirmed": true,
+    "momentum_confirmed": true,
+    "liquidity_confirmed": true,
+    "volatility_confirmed": true,
+    "vix_value": 16.5,
     "vix_level": "low",
     "recommended": [{"ticker": "TQQQ", "leverage": 3, "position_pct": 5, "stop_loss": -5, "max_hold_days": 5}],
     "not_recommended": [],

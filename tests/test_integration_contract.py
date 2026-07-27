@@ -258,13 +258,41 @@ def test_us_leveraged_signal_fails_closed_and_bounds_exposure():
             ],
         )
 
-    with pytest.raises(ValueError, match="complete inputs"):
+    with pytest.raises(ValueError, match="at least one supported product"):
         m.LeveragedETFSignal(direction="long")
+
+    with pytest.raises(ValueError, match="complete confirmed inputs"):
+        m.LeveragedETFSignal(
+            direction="long",
+            recommended=[
+                {
+                    "ticker": "TQQQ",
+                    "leverage": 3,
+                    "position_pct": 3,
+                    "stop_loss": -5,
+                    "max_hold_days": 2,
+                }
+            ],
+        )
+
+    with pytest.raises(ValueError, match="unsupported leveraged ETF"):
+        m.LeveragedETFPosition(
+            ticker="FNGU",
+            leverage=3,
+            position_pct=2,
+            stop_loss=-5,
+            max_hold_days=2,
+        )
 
     with pytest.raises(ValueError, match="inverse products"):
         m.LeveragedETFSignal(
             direction="long",
             inputs_complete=True,
+            trend_confirmed=True,
+            momentum_confirmed=True,
+            liquidity_confirmed=True,
+            volatility_confirmed=True,
+            vix_value=20,
             recommended=[
                 {
                     "ticker": "SQQQ",
@@ -276,10 +304,55 @@ def test_us_leveraged_signal_fails_closed_and_bounds_exposure():
             ],
         )
 
+    with pytest.raises(ValueError, match="unsupported leveraged ETF"):
+        m.LeveragedETFSignal(
+            direction="long",
+            inputs_complete=True,
+            trend_confirmed=True,
+            momentum_confirmed=True,
+            liquidity_confirmed=True,
+            volatility_confirmed=True,
+            vix_value=20,
+            recommended=[
+                {
+                    "ticker": "XYZ",
+                    "leverage": 3,
+                    "position_pct": 3,
+                    "stop_loss": -5,
+                    "max_hold_days": 2,
+                }
+            ],
+        )
+
+    with pytest.raises(ValueError, match="target leverage"):
+        m.LeveragedETFSignal(
+            direction="long",
+            inputs_complete=True,
+            trend_confirmed=True,
+            momentum_confirmed=True,
+            liquidity_confirmed=True,
+            volatility_confirmed=True,
+            vix_value=20,
+            recommended=[
+                {
+                    "ticker": "TQQQ",
+                    "leverage": 0.1,
+                    "position_pct": 3,
+                    "stop_loss": -5,
+                    "max_hold_days": 2,
+                }
+            ],
+        )
+
     with pytest.raises(ValueError, match="notional exposure"):
         m.LeveragedETFSignal(
             direction="long",
             inputs_complete=True,
+            trend_confirmed=True,
+            momentum_confirmed=True,
+            liquidity_confirmed=True,
+            volatility_confirmed=True,
+            vix_value=20,
             recommended=[
                 {
                     "ticker": "TQQQ",
@@ -295,6 +368,26 @@ def test_us_leveraged_signal_fails_closed_and_bounds_exposure():
                     "stop_loss": -5,
                     "max_hold_days": 4,
                 },
+            ],
+        )
+
+    with pytest.raises(ValueError, match="VIX above 30"):
+        m.LeveragedETFSignal(
+            direction="inverse",
+            inputs_complete=True,
+            trend_confirmed=True,
+            momentum_confirmed=True,
+            liquidity_confirmed=True,
+            volatility_confirmed=True,
+            vix_value=31,
+            recommended=[
+                {
+                    "ticker": "SQQQ",
+                    "leverage": 3,
+                    "position_pct": 3,
+                    "stop_loss": -5,
+                    "max_hold_days": 2,
+                }
             ],
         )
 
