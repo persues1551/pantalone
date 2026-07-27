@@ -717,6 +717,73 @@ def test_us_evidence_models_fail_closed_across_fields():
     assert risk_b.warnings == []
 
 
+def test_risk_alert_bidirectional_consistency():
+    m = load_schemas()
+    pass_checks = {
+        key: {"status": "pass", "detail": "No material issue found in current filing"}
+        for key in ("delisting", "litigation", "insider_selling", "goodwill",
+                     "debt", "customer_concentration", "regulatory", "accounting")
+    }
+    base = dict(ticker="X", data_sources=["SEC EDGAR", "yfinance"], data_quality="A")
+
+    with pytest.raises(ValueError, match="warn risk checks require non-empty warnings"):
+        warn_checks = dict(pass_checks)
+        warn_checks["litigation"] = {"status": "warn", "detail": "pending class action disclosed in latest 10-Q"}
+        m.USRiskReport(**base, checks=warn_checks, overall_risk="medium", risk_score=60)
+
+    with pytest.raises(ValueError, match="warnings require at least one warn risk check"):
+        m.USRiskReport(**base, checks=pass_checks, overall_risk="medium", risk_score=60,
+                        warnings=["unsupported concentration claim"])
+
+    with pytest.raises(ValueError, match="critical overall risk with failed checks requires critical alerts"):
+        fail_checks = dict(pass_checks)
+        fail_checks["debt"] = {"status": "fail", "detail": "interest coverage ratio below 1x per latest 10-K"}
+        m.USRiskReport(**base, checks=fail_checks, overall_risk="critical", risk_score=10)
+
+
+def test_incomplete_risk_cannot_carry_critical_alerts():
+    m = load_schemas()
+    with pytest.raises(ValueError, match="incomplete risk evidence cannot carry critical alerts"):
+        m.USRiskReport(ticker="X", overall_risk="unknown", risk_score=0,
+                        critical_alerts=["unsubstantiated alert"],
+                        checks={}, data_quality="D")
+
+
+def test_avoid_direction_rejects_confirmations():
+    m = load_schemas()
+    with pytest.raises(ValueError, match="avoid direction cannot carry confirmed inputs"):
+        m.LeveragedETFSignal(direction="avoid", inputs_complete=True)
+
+
+def test_evidence_sources_dedup_across_same_underlying():
+    m = load_schemas()
+    refs = {
+        "valuation": "https://www.sec.gov/Archives/edgar/data/1234/report.htm",
+        "growth": "https://www.sec.gov/Archives/edgar/data/1234/report.htm#fragment",
+        "profitability": "https://www.sec.gov/Archives/edgar/data/1234/report.htm#other",
+        "balance_sheet": "https://www.sec.gov/Archives/edgar/data/1234/report.htm#bs",
+        "peers": "https://www.sec.gov/Archives/edgar/data/1234/report.htm#peers",
+        "oligopoly": "https://finance.yahoo.com/quote/X",
+        "catalyst": "https://www.sec.gov/Archives/edgar/data/1234/report.htm#catalyst",
+        "industry_moat": "https://www.sec.gov/Archives/edgar/data/1234/report.htm#moat",
+        "financial_blast": "https://www.sec.gov/Archives/edgar/data/1234/report.htm#fin",
+        "quarterly_continuity": "https://www.sec.gov/Archives/edgar/data/1234/report.htm#q",
+    }
+    with pytest.raises(ValueError, match="incomplete financial evidence"):
+        m.USFinancialReport(
+            ticker="X", financial_score=80,
+            valuation={"forward_pe": 30, "fcf_yield": 3},
+            growth={"revenue_yoy": "+20%", "eps_yoy": "+25%"},
+            profitability={"roe": 30, "gross_margin": 60},
+            balance_sheet={"cash_to_debt": 2, "current_ratio": 1.5},
+            peer_comparison=[{"ticker": "AMD", "forward_pe": 25}],
+            ocifq={k: "substantive evidence from current filings filed with the SEC" for k in (
+                "oligopoly", "catalyst", "industry_moat", "financial_blast", "quarterly_continuity")},
+            data_sources=["SEC", "company 10-k"], data_quality="A",
+            evidence_refs=refs,
+        )
+
+
 def test_us_index_alias_contract_round_trips_as_documented_json():
     m = load_schemas()
     payload = {

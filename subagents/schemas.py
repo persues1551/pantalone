@@ -746,13 +746,13 @@ def _source_category(value: str) -> Optional[str]:
     normalized = value.strip().lower()
     categories = {
         "sec": "sec", "sec edgar": "sec",
+        "company 10-k": "sec", "company 10-q": "sec",
+        "company 8-k": "sec", "official company filing": "sec",
         "yfinance": "yfinance",
         "financial modeling prep": "fmp", "fmp": "fmp",
         "finra": "finra", "cftc": "cftc", "fred": "fred",
         "nasdaq": "exchange", "nyse": "exchange",
         "company investor relations": "company",
-        "company 10-k": "company", "company 10-q": "company",
-        "company 8-k": "company", "official company filing": "company",
     }
     return categories.get(normalized)
 
@@ -857,7 +857,7 @@ class LeveragedETFSignal(BaseModel):
     breadth_confirmed: bool = False
     liquidity_confirmed: bool = False
     volatility_confirmed: bool = False
-    vix_value: Optional[float] = Field(default=None, ge=0)
+    vix_value: Optional[float] = Field(default=None, ge=0, allow_inf_nan=False)
     underlying_index: str = ""
     price_vs_20ma_pct: Optional[float] = Field(default=None, allow_inf_nan=False)
     ma20_slope_pct: Optional[float] = Field(default=None, allow_inf_nan=False)
@@ -885,6 +885,8 @@ class LeveragedETFSignal(BaseModel):
         )
         if self.direction != "avoid" and not all(confirmations):
             raise ValueError("directional leveraged signal requires complete confirmed inputs")
+        if self.direction == "avoid" and any(confirmations):
+            raise ValueError("avoid direction cannot carry confirmed inputs")
         if self.direction != "avoid":
             if self.vix_value is None:
                 raise ValueError("directional leveraged signal requires a current VIX value")
@@ -1001,6 +1003,8 @@ class USMarketDataReport(BaseModel):
             or self.leveraged_signal.direction != "avoid"
             or self.data_quality != DataQuality.D
         )
+        if parsed_date is not None and parsed_date > date.today() and carries_conclusion:
+            raise ValueError("market report cannot carry a conclusion with a future data date")
         if not evidence_complete and carries_conclusion:
             raise ValueError(
                 "incomplete market evidence requires unknown regime, empty advice, avoid signal, and data quality D"
@@ -1010,15 +1014,22 @@ class USMarketDataReport(BaseModel):
         ):
             raise ValueError("data quality D cannot carry a directional market conclusion")
         if evidence_complete:
-            if self.market_regime != "unknown" and parsed_date is not None:
-                if parsed_date > date.today():
-                    raise ValueError("directional market conclusion cannot use a future data date")
-                if parsed_date < date.today() - timedelta(days=3):
-                    raise ValueError("directional market conclusion requires data no older than 3 days")
+            if self.market_regime != "unknown" and parsed_date is not None and parsed_date < date.today() - timedelta(days=3):
+                raise ValueError("directional market conclusion requires data no older than 3 days")
             actual_vix = float(self.vix["value"])
             index_rows = [self.indices[key] for key in required_indices]
             above_50 = sum(row.above_50ma for row in index_rows)
             above_200 = sum(row.above_200ma for row in index_rows)
+            required_advice_by_regime = {
+                "risk_on": {"increase_risk", "neutral"},
+                "neutral": {"neutral", "stay_flat"},
+                "risk_off": {"reduce_risk", "stay_flat"},
+            }
+            if not self.position_advice:
+                if self.market_regime == "risk_on" and actual_vix < 25 and above_50 >= 3 and above_200 >= 3:
+                    raise ValueError("risk_on with full evidence requires explicit position advice")
+                if self.market_regime == "risk_off" and actual_vix >= 20 and above_50 <= 1 and above_200 <= 1:
+                    raise ValueError("risk_off with full evidence requires explicit position advice")
             if self.market_regime == "risk_on" and not (actual_vix < 25 and above_50 >= 3 and above_200 >= 3):
                 raise ValueError("risk_on requires VIX below 25 and broad index trend confirmation")
             if self.market_regime == "risk_off" and not (actual_vix >= 20 and above_50 <= 1 and above_200 <= 1):
@@ -1125,7 +1136,10 @@ class USFinancialReport(BaseModel):
             and urlparse(self.evidence_refs[key]).hostname in trusted_hosts
             and urlparse(self.evidence_refs[key]).path not in {"", "/"}
             for key in required_refs
-        ) and len(set(self.evidence_refs.values())) >= 5 and len(
+        ) and len({
+            urlparse(self.evidence_refs[key])._replace(fragment="").geturl()
+            for key in required_refs
+        }) >= 5 and len(
             {urlparse(self.evidence_refs[key]).hostname for key in required_refs}
         ) >= 2
         valuation_evidence = sum(_finite_number(value) and abs(value) > 1e-12 for value in self.valuation.model_dump().values()) >= 2
@@ -1228,9 +1242,13 @@ class USRiskReport(BaseModel):
                 raise ValueError("incomplete risk evidence requires unknown risk, score 0, and data quality D")
             if self.warnings:
                 raise ValueError("incomplete risk evidence cannot carry warnings")
+            if self.critical_alerts:
+                raise ValueError("incomplete risk evidence cannot carry critical alerts")
             return self
         statuses = {result.status for result in required_results}
         if self.critical_alerts:
+            if not evidence_complete:
+                raise ValueError("critical alerts require complete risk evidence")
             if "fail" not in statuses:
                 raise ValueError("critical alerts require a failed risk check")
             if self.overall_risk != "critical" or self.risk_score > 20 or self.data_quality == DataQuality.D:
@@ -1246,6 +1264,12 @@ class USRiskReport(BaseModel):
             raise ValueError("all-pass risk checks without warnings require low risk and score >= 76")
         if self.warnings and (self.overall_risk == "low" or self.risk_score > 75):
             raise ValueError("warnings cannot produce low risk or score > 75")
+        if "warn" in statuses and not self.warnings:
+            raise ValueError("warn risk checks require non-empty warnings")
+        if self.warnings and "warn" not in statuses:
+            raise ValueError("warnings require at least one warn risk check")
+        if "fail" in statuses and self.overall_risk == "critical" and not self.critical_alerts:
+            raise ValueError("critical overall risk with failed checks requires critical alerts")
         score_ranges = {
             "critical": (0, 20),
             "high": (0, 40),
