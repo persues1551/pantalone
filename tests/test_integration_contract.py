@@ -480,6 +480,28 @@ def test_us_models_do_not_share_mutable_defaults():
     assert risk_b.warnings == []
 
 
+def test_us_index_alias_contract_round_trips_as_documented_json():
+    m = load_schemas()
+    payload = {
+        "price": 100,
+        "5d_return": 1.0,
+        "1m_return": 2.0,
+        "3m_return": 3.0,
+        "52w_high_drawdown": -4.0,
+        "above_50ma": True,
+        "above_200ma": True,
+        "volatility_60d": 15.0,
+    }
+    row = m.IndexData(**payload)
+    dumped = row.model_dump()
+    assert dumped["5d_return"] == 1.0
+    assert dumped["1m_return"] == 2.0
+    assert dumped["3m_return"] == 3.0
+    assert dumped["52w_high_drawdown"] == -4.0
+    assert "five_day_return" not in dumped
+    assert m.IndexData(**dumped) == row
+
+
 def test_schema_renderers_accept_partial_optional_market_data():
     m = load_schemas()
     macro = m.MacroAnalysisReport(

@@ -10,7 +10,7 @@ from __future__ import annotations
 from enum import Enum
 from typing import Any, Dict, List, Literal, Optional
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 # ============================================================================
@@ -734,6 +734,9 @@ def render_etf_review_result(result: ETFReviewResult) -> str:
 
 class IndexData(BaseModel):
     """Single index data point."""
+
+    model_config = ConfigDict(populate_by_name=True, serialize_by_alias=True)
+
     price: float
     five_day_return: float = Field(alias="5d_return")
     one_month_return: float = Field(alias="1m_return")
