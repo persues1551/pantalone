@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import date
 import importlib.util
 import json
 import os
@@ -423,6 +424,44 @@ def test_us_leveraged_signal_fails_closed_and_bounds_exposure():
             ],
         )
 
+    with pytest.raises(ValueError, match="numeric observations"):
+        m.LeveragedETFSignal(
+            direction="long",
+            inputs_complete=True,
+            trend_confirmed=True,
+            momentum_confirmed=True,
+            breadth_confirmed=True,
+            liquidity_confirmed=True,
+            volatility_confirmed=True,
+            vix_value=20,
+            recommended=[
+                {"ticker": "TQQQ", "leverage": 3, "position_pct": 3,
+                 "stop_loss": -5, "max_hold_days": 2}
+            ],
+        )
+
+    valid_long = m.LeveragedETFSignal(
+        direction="long",
+        inputs_complete=True,
+        trend_confirmed=True,
+        momentum_confirmed=True,
+        breadth_confirmed=True,
+        liquidity_confirmed=True,
+        volatility_confirmed=True,
+        vix_value=20,
+        underlying_index="^IXIC",
+        price_vs_20ma_pct=2,
+        ma20_slope_pct=1,
+        macd_histogram=0.5,
+        breadth_decline_advance_ratio=0.8,
+        volume_to_20d_ratio=1.1,
+        recommended=[
+            {"ticker": "TQQQ", "leverage": 3, "position_pct": 3,
+             "stop_loss": -5, "max_hold_days": 2}
+        ],
+    )
+    assert valid_long.direction == "long"
+
     with pytest.raises(ValueError, match="VIX above 30"):
         m.LeveragedETFSignal(
             direction="inverse",
@@ -476,6 +515,15 @@ def test_us_evidence_models_fail_closed_across_fields():
             vix={"value": 35}, dxy={"value": 104}, tnx={"value": 4.2},
             sector_rotation={"weakening": ["XLK"]},
             data_date="2026-07-27", market_regime="risk_on", data_quality="A",
+        )
+
+    with pytest.raises(ValueError, match="directional market conclusion requires data no older"):
+        m.USMarketDataReport(
+            indices={key: valid_index for key in ("^GSPC", "^IXIC", "^DJI", "^RUT")},
+            vix={"value": 16}, dxy={"value": 104}, tnx={"value": 4.2},
+            sector_rotation={"trending_high": ["XLK"]},
+            data_date="2000-01-01", market_regime="risk_on",
+            position_advice="increase_risk", data_quality="A",
         )
 
     empty_market = m.USMarketDataReport(indices={})

@@ -7,7 +7,7 @@ schemas alone does not wire structured output into the runtime.
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, timedelta
 from enum import Enum
 import math
 import re
@@ -849,6 +849,12 @@ class LeveragedETFSignal(BaseModel):
     liquidity_confirmed: bool = False
     volatility_confirmed: bool = False
     vix_value: Optional[float] = Field(default=None, ge=0)
+    underlying_index: str = ""
+    price_vs_20ma_pct: Optional[float] = Field(default=None, allow_inf_nan=False)
+    ma20_slope_pct: Optional[float] = Field(default=None, allow_inf_nan=False)
+    macd_histogram: Optional[float] = Field(default=None, allow_inf_nan=False)
+    breadth_decline_advance_ratio: Optional[float] = Field(default=None, ge=0, allow_inf_nan=False)
+    volume_to_20d_ratio: Optional[float] = Field(default=None, ge=0, allow_inf_nan=False)
     vix_level: str = "unknown"
     recommended: list[LeveragedETFPosition] = Field(default_factory=list)
     not_recommended: list[str] = Field(default_factory=list)
@@ -879,15 +885,47 @@ class LeveragedETFSignal(BaseModel):
             if self.direction == "long" and vix_value >= 25:
                 raise ValueError("long leveraged signal requires VIX below 25")
             if self.direction == "inverse" and not 25 <= vix_value <= 30:
-                raise ValueError("inverse leveraged signal requires VIX between 25 and 30")
-        tickers = {item.ticker for item in self.recommended}
-        if tickers:
+                raise ValueError("inverse products require VIX in the 25-30 confirmation band")
+            tickers = {item.ticker for item in self.recommended}
             expected_direction = {LEVERAGED_ETF_CONTRACTS[ticker][0] for ticker in tickers}
             if expected_direction != {self.direction}:
                 raise ValueError("recommended products must match signal direction")
-        exposure = sum(item.position_pct * item.leverage / 100 for item in self.recommended)
-        if exposure > 0.5:
-            raise ValueError("recommended leveraged notional exposure must be <= 0.5")
+            exposure = sum(item.position_pct * item.leverage / 100 for item in self.recommended)
+            if exposure > 0.5:
+                raise ValueError("recommended leveraged notional exposure must be <= 0.5")
+            observations = (
+                self.underlying_index.strip(),
+                self.price_vs_20ma_pct,
+                self.ma20_slope_pct,
+                self.macd_histogram,
+                self.breadth_decline_advance_ratio,
+                self.volume_to_20d_ratio,
+            )
+            if not all(value is not None and value != "" for value in observations):
+                raise ValueError("directional leveraged signal requires numeric observations")
+            assert self.price_vs_20ma_pct is not None
+            assert self.ma20_slope_pct is not None
+            assert self.macd_histogram is not None
+            assert self.breadth_decline_advance_ratio is not None
+            assert self.volume_to_20d_ratio is not None
+            price_vs_20ma = self.price_vs_20ma_pct
+            ma20_slope = self.ma20_slope_pct
+            macd_histogram = self.macd_histogram
+            breadth_ratio = self.breadth_decline_advance_ratio
+            volume_ratio = self.volume_to_20d_ratio
+            if volume_ratio < 0.8:
+                raise ValueError("directional leveraged signal requires adequate volume")
+            if self.direction == "long" and not (
+                price_vs_20ma > 0 and ma20_slope > 0 and macd_histogram > 0
+            ):
+                raise ValueError("long signal observations do not confirm trend and momentum")
+            if self.direction == "inverse" and not (
+                price_vs_20ma < 0
+                and ma20_slope < 0
+                and macd_histogram < 0
+                and breadth_ratio > 2
+            ):
+                raise ValueError("inverse signal observations do not confirm trend, momentum, and breadth")
         return self
 
 
@@ -908,8 +946,9 @@ class USMarketDataReport(BaseModel):
     @model_validator(mode="after")
     def enforce_market_evidence(self) -> "USMarketDataReport":
         required_indices = {"^GSPC", "^IXIC", "^DJI", "^RUT"}
+        parsed_date: Optional[date] = None
         try:
-            date.fromisoformat(self.data_date)
+            parsed_date = date.fromisoformat(self.data_date)
             valid_date = True
         except ValueError:
             valid_date = False
@@ -959,6 +998,8 @@ class USMarketDataReport(BaseModel):
         ):
             raise ValueError("data quality D cannot carry a directional market conclusion")
         if evidence_complete:
+            if self.market_regime != "unknown" and parsed_date is not None and parsed_date < date.today() - timedelta(days=3):
+                raise ValueError("directional market conclusion requires data no older than 3 days")
             actual_vix = float(self.vix["value"])
             index_rows = [self.indices[key] for key in required_indices]
             above_50 = sum(row.above_50ma for row in index_rows)
