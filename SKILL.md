@@ -6,6 +6,18 @@ version: 3.5.0
 
 # Pantalone 投研模块
 
+## v4 架构入口
+
+在 Amadeus 三 agent 架构中，Pantalone 只负责投研分析。医学科研交给 Newtown，自媒体写作交给 Ricardo，Amadeus 负责总控路由和跨 agent 汇总。
+
+新任务优先读取：
+
+- `/Users/liutong/.hermes/agents/amadeus-router.md`
+- `/Users/liutong/.hermes/agents/pantalone.md`
+- `workflow_v4_unified.md`
+
+旧 `SOUL.md`、`router.md`、`workflow.md`、`rules/`、`subagents/`、`templates/` 保持兼容，用于历史 cron、投研规则和报告模板。
+
 ## 核心引用
 
 **灵魂文档**：`SOUL.md` — 投资哲学、价值观、工作原则。
