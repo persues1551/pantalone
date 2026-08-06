@@ -1014,8 +1014,6 @@ class USMarketDataReport(BaseModel):
         ):
             raise ValueError("data quality D cannot carry a directional market conclusion")
         if evidence_complete:
-            if self.market_regime != "unknown" and parsed_date is not None and parsed_date < date.today() - timedelta(days=3):
-                raise ValueError("directional market conclusion requires data no older than 3 days")
             actual_vix = float(self.vix["value"])
             index_rows = [self.indices[key] for key in required_indices]
             above_50 = sum(row.above_50ma for row in index_rows)
@@ -1025,15 +1023,17 @@ class USMarketDataReport(BaseModel):
                 "neutral": {"neutral", "stay_flat"},
                 "risk_off": {"reduce_risk", "stay_flat"},
             }
-            if not self.position_advice:
-                if self.market_regime == "risk_on" and actual_vix < 25 and above_50 >= 3 and above_200 >= 3:
-                    raise ValueError("risk_on with full evidence requires explicit position advice")
-                if self.market_regime == "risk_off" and actual_vix >= 20 and above_50 <= 1 and above_200 <= 1:
-                    raise ValueError("risk_off with full evidence requires explicit position advice")
             if self.market_regime == "risk_on" and not (actual_vix < 25 and above_50 >= 3 and above_200 >= 3):
                 raise ValueError("risk_on requires VIX below 25 and broad index trend confirmation")
             if self.market_regime == "risk_off" and not (actual_vix >= 20 and above_50 <= 1 and above_200 <= 1):
                 raise ValueError("risk_off requires VIX at least 20 and broad index weakness")
+            if self.market_regime != "unknown" and parsed_date is not None and parsed_date < date.today() - timedelta(days=3):
+                raise ValueError("directional market conclusion requires data no older than 3 days")
+            if not self.position_advice:
+                if self.market_regime == "risk_on":
+                    raise ValueError("risk_on with full evidence requires explicit position advice")
+                if self.market_regime == "risk_off":
+                    raise ValueError("risk_off with full evidence requires explicit position advice")
             advice_by_regime = {
                 "risk_on": {"increase_risk", "neutral"},
                 "neutral": {"neutral", "stay_flat"},

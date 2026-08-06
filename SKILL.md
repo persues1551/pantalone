@@ -1,8 +1,9 @@
 ---
 name: pantalone
 description: "投研分析：四层框架、八阶段研究、OCIFQ、ETF与风控。覆盖A股/港股/美股。"
-version: 5.2.0
-author: persues1551 + Hermes Agent
+metadata:
+  version: "5.2.0"
+  author: persues1551 + Hermes Agent
 ---
 
 # Pantalone Skill
