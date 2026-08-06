@@ -1272,9 +1272,8 @@ def test_optional_capability_probe_fails_closed_without_host_install(tmp_path):
 def test_release_metadata_matches_skill_contract_version():
     project = tomllib.loads((ROOT / "pyproject.toml").read_text())
     skill = (ROOT / "SKILL.md").read_text()
-    skill_version = re.search(r"^version:\s*[\"']?([^\s\"']+)", skill, re.MULTILINE)
-    assert skill_version is not None
-    assert project["tool"]["pantalone"]["version"] == skill_version.group(1)
+    frontmatter = yaml.safe_load(skill.split("---", 2)[1])
+    assert project["tool"]["pantalone"]["version"] == frontmatter["metadata"]["version"]
     assert project["tool"]["pantalone"]["distribution"] is False
     assert "build-system" not in project
     assert "project" not in project

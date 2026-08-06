@@ -39,7 +39,7 @@ def find_ancestor_scripts_dir(start: Path) -> Optional[Path]:
 
 
 REPOSITORY_SCRIPTS_DIR = find_ancestor_scripts_dir(PANTALONE_ROOT)
-SCRIPTS_DIR = REPOSITORY_SCRIPTS_DIR or INSTALLED_SCRIPTS_DIR
+SCRIPTS_DIR = REPOSITORY_SCRIPTS_DIR
 
 # 入口文件
 ENTRY_FILES = [
@@ -198,7 +198,7 @@ def check_old_train_scripts() -> Dict:
     old_scripts = []
     current_scripts = []
 
-    if SCRIPTS_DIR.exists():
+    if SCRIPTS_DIR is not None and SCRIPTS_DIR.exists():
         import glob
         for pattern in OLD_TRAIN_PATTERNS:
             for f in SCRIPTS_DIR.glob(pattern):
@@ -234,7 +234,7 @@ def check_credentials() -> Dict:
     """检查疑似硬编码密钥，不返回命中内容"""
     findings = []
     scan_roots = [("pantalone", PANTALONE_ROOT)]
-    if SCRIPTS_DIR.exists():
+    if SCRIPTS_DIR is not None and SCRIPTS_DIR.exists():
         scan_roots.append(("amadeus", SCRIPTS_DIR))
 
     for label, base in scan_roots:
