@@ -748,7 +748,10 @@ def _source_category(value: str) -> Optional[str]:
         "sec": "sec", "sec edgar": "sec",
         "company 10-k": "sec", "company 10-q": "sec",
         "company 8-k": "sec", "official company filing": "sec",
-        "yfinance": "yfinance",
+        "yfinance": "yfinance",  # legacy: unusable from CN network since 2026-08 (fc.yahoo.com TLS-blocked); kept for backward compat with old snapshots
+        "stockanalysis": "stockanalysis", "stockanalysis.com": "stockanalysis",
+        "query1 chart api": "query1", "query1": "query1", "query1.finance.yahoo.com": "query1",
+        "openinsider": "openinsider",
         "financial modeling prep": "fmp", "fmp": "fmp",
         "finra": "finra", "cftc": "cftc", "fred": "fred",
         "nasdaq": "exchange", "nyse": "exchange",
@@ -1129,6 +1132,7 @@ class USFinancialReport(BaseModel):
         }
         trusted_hosts = {
             "sec.gov", "www.sec.gov", "data.sec.gov", "finance.yahoo.com",
+            "stockanalysis.com", "query1.finance.yahoo.com",
             "financialmodelingprep.com", "site.financialmodelingprep.com",
         }
         refs_complete = required_refs.issubset(self.evidence_refs) and all(

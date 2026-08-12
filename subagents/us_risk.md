@@ -12,7 +12,7 @@ delegate_task(
 
 1. 退市风险检查：股价是否<$1（30天）、是否收到不合规通知、市值是否<$5000万
 2. 集体诉讼风险：搜索 SEC 调查公告、证券欺诈诉讼
-3. Insider Selling：yfinance 获取 insider transactions，检查高管/董事连续减持
+3. Insider Selling：SEC Form 4  filings（`https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK={CIK}&type=4`，⚠️ 必须用 CIK 或公司全名——用 ticker（如 NVDA）会返回 "No matching companies." 静默空结果；或 openinsider 公开页）获取 insider transactions，检查高管/董事连续减持
 4. 商誉减值风险：商誉/总资产 > 30%？近期标的业绩是否下滑？
 5. 债务压力：利息覆盖率、短期债务/现金比
 6. 客户集中度：10-K 中是否有单一客户 > 25%？
@@ -29,11 +29,11 @@ delegate_task(
 
 | # | 检查项 | 数据源 | 阈值 | 处置 |
 |---|--------|--------|------|------|
-| 1 | 退市风险 | yfinance + SEC | 股价<$1×30天 / 不合规通知 | 一票否决 |
+| 1 | 退市风险 | query1 chart API + SEC | 股价<$1×30天 / 不合规通知 | 一票否决 |
 | 2 | 集体诉讼 | SEC Litigation + web搜索 | 证券欺诈/误导陈述/SEC调查 | 警告 |
-| 3 | Insider Selling | yfinance.insider_transactions | 连续3月减持>持仓10% | 警告 |
-| 4 | 商誉减值 | yfinance.balance_sheet | 商誉>总资产30% + 标的下滑 | 警告 |
-| 5 | 债务压力 | yfinance.financials | 利息覆盖率<2x / 短债>现金2x | 警告 |
+| 3 | Insider Selling | SEC Form 4 / openinsider | 连续3月减持>持仓10% | 警告 |
+| 4 | 商誉减值 | SEC 10-K balance sheet | 商誉>总资产30% + 标的下滑 | 警告 |
+| 5 | 债务压力 | SEC 10-K financials | 利息覆盖率<2x / 短债>现金2x | 警告 |
 | 6 | 客户集中度 | 10-K Risk Factors | 单一客户>营收25% | 警告 |
 | 7 | 监管风险 | SEC+新闻 | 反垄断/CFIUS/出口管制 | 警告或否决 |
 | 8 | 会计质量 | 10-K/10-Q | non-GAAP偏差>20% / 审计师更换 | 警告 |
@@ -70,7 +70,7 @@ delegate_task(
   "critical_alerts": [],
   "warnings": ["export_controls"],
   "risk_bias": "偏多（低风险）",
-  "data_sources": ["yfinance", "SEC EDGAR"],
+  "data_sources": ["SEC EDGAR", "query1 chart API"],
   "data_quality": "A",
   "errors": []
 }

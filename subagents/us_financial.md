@@ -9,7 +9,7 @@
 ```python
 delegate_task(
     goal="""你是美股财务分析专家。分析{股票代码}的财务数据：
-1. 使用 yfinance 获取最近4个季度营收/利润/自由现金流趋势
+1. 使用 SEC EDGAR（10-K/10-Q XBRL）获取最近4个季度营收/利润/自由现金流趋势
 2. 获取 forward PE、trailing PE、EV/EBITDA、PEG
 3. 计算 ROE、毛利率、营业利润率、FCF yield
 4. 获取 SEC EDGAR 最近 10-K/10-Q 的关键披露（业务描述、风险因素、管理层讨论）
@@ -17,18 +17,21 @@ delegate_task(
 6. 会计口径校验：季度对季度、币种标注、行业差异、异常值复核
 
 返回财务面评分和结论。""",
-    context="美股财报分析任务 — yfinance + SEC EDGAR",
+    context="美股财报分析任务 — SEC EDGAR + StockAnalysis + query1 chart",
     toolsets=["terminal", "web"]
 )
 ```
 
 ## 数据源优先级
 
-1. **yfinance** — 财务报表、估值指标、股价（主力）
-2. **SEC EDGAR** — 10-K/10-Q原始文件（权威，免费）
+1. **SEC EDGAR** — 10-K/10-Q原始文件（权威，免费；主力）
    - 提交索引：`https://data.sec.gov/submissions/CIK{CIK}.json`
    - 10-K/10-Q 直接通过 xbrl 或 html 获取
-3. **Financial Modeling Prep** — 结构化财务数据（备用，需 API key）
+2. **StockAnalysis.com** — 估值指标、财务比率、分析师共识（`https://stockanalysis.com/stocks/{TICKER}/`，免费可解析，2026-08-13 实测可用）
+3. **query1 chart API** — 股价/历史行情（`query1.finance.yahoo.com/v8/finance/chart/`，大陆直连可用）
+4. **Financial Modeling Prep** — 结构化财务数据（备用，需 API key）
+
+> ⚠️ **不要使用 yfinance 库的 info/financials**：`fc.yahoo.com` 在大陆网络被 TLS 干扰，不可用（2026-08-13 实测）。见 `references/institutional-research-sources.md`。
 
 ## 会计口径校验（强制）
 
@@ -50,7 +53,7 @@ delegate_task(
 
 ## 输出格式（必须遵守）
 
-下列数字仅为 Schema 形状示例，不是当前 NVDA 财务事实；实际执行必须重新读取 SEC EDGAR、yfinance/FMP 并写明 `as_of` 或数据日期。
+下列数字仅为 Schema 形状示例，不是当前 NVDA 财务事实；实际执行必须重新读取 SEC EDGAR、StockAnalysis/FMP 并写明 `as_of` 或数据日期。
 
 ```json
 {
@@ -96,17 +99,17 @@ delegate_task(
     "quarterly_continuity": "连续8季beat consensus + 连续6季guidance上调"
   },
   "accounting_notes": "GAAP口径，non-GAAP与GAAP偏差<5%",
-  "data_sources": ["SEC EDGAR", "yfinance"],
+  "data_sources": ["SEC EDGAR", "StockAnalysis"],
   "evidence_refs": {
-  "valuation": "https://finance.yahoo.com/quote/NVDA/key-statistics",
+  "valuation": "https://stockanalysis.com/stocks/nvda/",
   "growth": "https://www.sec.gov/Archives/edgar/data/{CIK}/{accession}/report.htm",
-  "profitability": "https://finance.yahoo.com/quote/NVDA/financials",
-  "balance_sheet": "https://finance.yahoo.com/quote/NVDA/balance-sheet",
-  "peers": "https://finance.yahoo.com/quote/AMD/key-statistics",
+  "profitability": "https://stockanalysis.com/stocks/nvda/financials/",
+  "balance_sheet": "https://stockanalysis.com/stocks/nvda/financials/balance-sheet/",
+  "peers": "https://stockanalysis.com/stocks/amd/",
   "oligopoly": "https://www.sec.gov/Archives/edgar/data/{CIK}/{accession}/business.htm",
   "catalyst": "https://www.sec.gov/Archives/edgar/data/{CIK}/{accession}/mdna.htm",
-  "industry_moat": "https://finance.yahoo.com/quote/NVDA/financials",
-  "financial_blast": "https://finance.yahoo.com/quote/NVDA/cash-flow",
+  "industry_moat": "https://stockanalysis.com/stocks/nvda/financials/",
+  "financial_blast": "https://stockanalysis.com/stocks/nvda/financials/cash-flow-statement/",
   "quarterly_continuity": "https://www.sec.gov/Archives/edgar/data/{CIK}/{accession}/quarterly.htm"
   },
   "data_quality": "A",

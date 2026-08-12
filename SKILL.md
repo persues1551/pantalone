@@ -108,7 +108,7 @@ Schema定义在 `subagents/schemas.py`，用于约束跨Agent数据，不代表H
 | 美股财务分析 | `subagents/us_financial.md` | `USFinancialReport` |
 | 美股风险审查 | `subagents/us_risk.md` | `USRiskReport` |
 
-美股数据源：yfinance（主力）、SEC EDGAR（10-K/10-Q）、Financial Modeling Prep（备用）。
+美股数据源：SEC EDGAR（10-K/10-Q，主力）、query1 chart API（K线，`query1.finance.yahoo.com/v8/finance/chart/`）、StockAnalysis.com（评级/估值）、Financial Modeling Prep（备用）。⚠️ yfinance 库在大陆网络不可用（fc.yahoo.com 被 TLS 干扰，2026-08-13 实测），机构研报获取见 `references/institutional-research-sources.md`。
 触发条件：用户明确问美股或需要外围市场深度分析时，加载上表 subagent 及 `../amadeus-us-market/SKILL.md`。
 杠杆/反向 ETF 分析：见 `references/us-leveraged-etf-guide.md`（标的清单、信号体系、止损规则、仓位控制）。
 
@@ -120,8 +120,8 @@ OCIFQ 五维框架在美股中的映射：
 |------|-----|----------|--------|
 | O 寡头定价权 | 市占率+毛利率 | 护城河宽度（品牌/网络效应/转换成本） | 10-K Business Description + 毛利率 > 行业均值 |
 | C 长周期催化 | 政策/国产替代/行业渗透率 | 技术平台锁定/AI基础设施/专利悬崖 | SEC Risk Factors + 行业研报 |
-| I 行业利润断层 | 毛利率 > 行业均值 + 5% | 营业利润率 > 同行中位数 + 竞争优势持续期 | yfinance.financials + 同行业对比 |
-| F 财务三爆 | 营收+利润+现金流增速 | 营收增速>15% + FCF yield>3% + ROE>15% | 10-K/10-Q + yfinance.cashflow |
+| I 行业利润断层 | 毛利率 > 行业均值 + 5% | 营业利润率 > 同行中位数 + 竞争优势持续期 | SEC 10-K/10-Q financials + StockAnalysis 同行对比 |
+| F 财务三爆 | 营收+利润+现金流增速 | 营收增速>15% + FCF yield>3% + ROE>15% | 10-K/10-Q + StockAnalysis cash flow |
 | Q 连续季报 | 连续4季增长 | 连续4季 beat consensus + guidance上调 | SEC EDGAR + earnings history |
 
 ### 美股排雷清单

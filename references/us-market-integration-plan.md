@@ -1,5 +1,7 @@
 # 美股纳入 Pantalone 业务范畴 — 集成方案
 
+> **2026-08-13 实测修正**：本文档为 v5.2 规划期产物，其中 yfinance 作为美股数据源的假设已失效（fc.yahoo.com 在大陆网络被 TLS 干扰；yfinance 1.5.x 的 curl_cffi 在 macOS 有 TLS 缺陷）。当前有效数据源见 `us-market-pantalone-adaptation.md` 数据源等级与 `institutional-research-sources.md`：K线用 query1 chart API，财务/评级用 SEC EDGAR + StockAnalysis.com。下文 yfinance 引用仅为历史规划记录。
+
 > v5.2 实施说明 | 已纳入当前候选并受完整8阶段与 fail-closed 契约约束
 
 ## 现状

@@ -9,7 +9,8 @@
 ```python
 delegate_task(
     goal="""你是美股市场数据采集专家。执行以下任务：
-1. 使用 yfinance 获取三大指数（^GSPC/^IXIC/^DJI）+ 罗素2000（^RUT）5日/1月/3月表现
+1. 使用 query1 chart API 获取三大指数（^GSPC/^IXIC/^DJI）+ 罗素2000（^RUT）5日/1月/3月表现
+   （`https://query1.finance.yahoo.com/v8/finance/chart/{SYMBOL}?range=3mo&interval=1d`，大陆直连可用；不要用 yfinance 库）
 2. 获取 VIX（^VIX）、美元指数（DX-Y.NYB）、10年期美债收益率（^TNX）
 3. 计算各指数距52周高点回撤、50/200日均线位置、60日年化波动率
 4. 获取11只SPDR行业ETF（XLC/XLY/XLP/XLE/XLF/XLV/XLI/XLB/XLRE/XLK/XLU）+ SMH半导体ETF的1月/3月/1年收益
@@ -24,10 +25,13 @@ delegate_task(
 
 ## 数据源优先级
 
-1. **yfinance** — 指数、ETF、VIX、DXY、TNX（主力，免费无API key）
-2. **^VIX / ^TNX / DX-Y.NYB** — yfinance Ticker直接拉取
-3. **SPDR ETFs** — 11行业+SMH，yfinance批量下载
+1. **query1 chart API** — 指数、ETF、VIX、DXY、TNX（主力，免费，大陆直连可用；2026-08-13 实测 HTTP 200）
+   `curl -sS -H "User-Agent: <浏览器UA>" 'https://query1.finance.yahoo.com/v8/finance/chart/^GSPC?range=3mo&interval=1d'`
+2. **^VIX / ^TNX / DX-Y.NYB** — 同 query1 chart API（URL 中 `^` 建议 percent-encode 为 `%5E`，如 `%5EGSPC`；实测未编码也返回 200，但编码更稳妥）
+3. **SPDR ETFs** — 11行业+SMH，query1 chart API 批量拉取（逐只 curl，间隔 1s 避免限流）
 4. **杠杆ETF行情** — TQQQ/SQQQ/UPRO/SPXU/SOXL/SOXS（按需拉取）
+
+> ⚠️ **不要使用 yfinance 库**：`fc.yahoo.com`（cookie/crumb）在大陆网络被 TLS 干扰，`yf.download`/`info` 均不可用（2026-08-13 实测）。见 `references/institutional-research-sources.md`。
 
 ## 行业轮动判断规则
 

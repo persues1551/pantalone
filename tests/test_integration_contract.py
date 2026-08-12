@@ -651,6 +651,40 @@ def test_us_evidence_models_fail_closed_across_fields():
     )
     assert complete_financial.financial_score == 80
 
+    # New-source positive case (2026-08): StockAnalysis + query1 chart API must
+    # pass the schema gate now that they are the CN-network-usable sources.
+    modern_financial = m.USFinancialReport(
+        ticker="NVDA",
+        financial_score=82,
+        valuation={"forward_pe": 30, "fcf_yield": 3.5},
+        growth={"revenue_yoy": "revenue grew 20%", "eps_yoy": "EPS grew 25%"},
+        profitability={"roe": 30, "gross_margin": 65},
+        balance_sheet={"cash_to_debt": 2, "current_ratio": 1.8},
+        peer_comparison=[{"ticker": "AMD", "forward_pe": 25}],
+        ocifq={
+            "oligopoly": "market share data supports durable leadership",
+            "catalyst": "multi-year demand growth supported by filings",
+            "industry_moat": "peer margins show persistent operating advantage",
+            "financial_blast": "revenue +20%, EPS +25%, and FCF +18%",
+            "quarterly_continuity": "four consecutive quarters beat consensus",
+        },
+        data_sources=["SEC EDGAR", "StockAnalysis"],
+        evidence_refs={
+            "valuation": "https://stockanalysis.com/stocks/nvda/",
+            "growth": "https://www.sec.gov/Archives/edgar/data/1045810/filing-growth.htm",
+            "profitability": "https://stockanalysis.com/stocks/nvda/financials/",
+            "balance_sheet": "https://stockanalysis.com/stocks/nvda/financials/balance-sheet/",
+            "peers": "https://stockanalysis.com/stocks/amd/",
+            "oligopoly": "https://www.sec.gov/Archives/edgar/data/1045810/filing-business.htm",
+            "catalyst": "https://www.sec.gov/Archives/edgar/data/1045810/filing-mdna.htm",
+            "industry_moat": "https://stockanalysis.com/stocks/nvda/financials/",
+            "financial_blast": "https://stockanalysis.com/stocks/nvda/financials/cash-flow-statement/",
+            "quarterly_continuity": "https://www.sec.gov/Archives/edgar/data/1045810/filing-quarterly.htm",
+        },
+        data_quality="A",
+    )
+    assert modern_financial.financial_score == 82
+
     with pytest.raises(ValueError, match="incomplete risk evidence"):
         m.USRiskReport(ticker="NVDA", overall_risk="low", risk_score=90, data_quality="A")
 

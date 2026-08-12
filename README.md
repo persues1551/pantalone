@@ -42,7 +42,8 @@ Install or clone this repository as the `pantalone` Hermes Skill, then load it w
 | Tencent Quote API | Real-time quotes, technical indicators | None |
 | AKShare | ETF, sectors, financials | Heavy (429) |
 | Tushare Pro | Northbound flow, SHIBOR, daily bars | 120-credit tier |
-| yfinance | Fundamentals (PE/PB/ROE), US stocks | Moderate (429) |
+| query1 chart API | US K-line/history (query1.finance.yahoo.com) | UA header required (429 without) |
+| SEC EDGAR + StockAnalysis | US fundamentals/ratings (yfinance unusable in CN network) | EDGAR 10 req/s |
 | East Money | News, sector flow, LHB, margin trading | IP-based throttling |
 
 ## Optional ML Evidence

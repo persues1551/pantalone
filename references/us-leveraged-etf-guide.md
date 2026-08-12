@@ -169,25 +169,20 @@ UVXY/VIXY 不在本框架的可推荐白名单中。它们跟踪 VIX 期货而�
 
 ## 数据获取
 
-```python
-import yfinance as yf
+```bash
+# ⚠️ 不要用 yfinance 库（大陆网络 fc.yahoo.com 被 TLS 干扰，2026-08-13 实测）。
+# 用 query1 chart API（必须带 UA 头，否则 429；^ 用 %5E 编码）：
+UA='Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36'
 
-# 杠杆ETF行情
-tqqq = yf.Ticker("TQQQ")
-sq = yf.Ticker("SQQQ")
+# 杠杆ETF行情（TQQQ/SQQQ 等）
+curl -sS -H "User-Agent: $UA" 'https://query1.finance.yahoo.com/v8/finance/chart/TQQQ?range=1mo&interval=1d'
 
-# 关键指标
-tqqq.info       # AUM, expense ratio
-tqqq.history(period="1mo")  # 价格 + 成交量
+# VIX 判断（%5EVIX）
+curl -sS -H "User-Agent: $UA" 'https://query1.finance.yahoo.com/v8/finance/chart/%5EVIX?range=5d&interval=1d'
 
-# VIX判断
-vix = yf.Ticker("^VIX").history(period="5d")["Close"].iloc[-1]
-
-# 底层指数趋势
-ndx = yf.Ticker("^IXIC").history(period="3mo")
-ma20 = ndx["Close"].rolling(20).mean().iloc[-1]
-current = ndx["Close"].iloc[-1]
-trend = "UP" if current > ma20 else "DOWN"
+# 底层指数趋势（%5EIXIC 纳指），用 Python 计算 MA20：
+curl -sS -H "User-Agent: $UA" 'https://query1.finance.yahoo.com/v8/finance/chart/%5EIXIC?range=3mo&interval=1d' \
+  | python3 -c "import json,sys; d=json.load(sys.stdin); r=d['chart']['result'][0]; c=[x for x in r['indicators']['quote'][0]['close'] if x is not None]; ma20=sum(c[-20:])/20; print('MA20=', round(ma20,2), 'LAST=', c[-1], 'TREND=', 'UP' if c[-1]>ma20 else 'DOWN')"
 ```
 
 ## 常见陷阱
