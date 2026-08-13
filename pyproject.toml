@@ -8,3 +8,6 @@ target-version = "py310"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+markers = [
+    "live: live network probe (skipped when network unavailable)",
+]

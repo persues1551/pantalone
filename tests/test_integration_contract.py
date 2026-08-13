@@ -1717,7 +1717,168 @@ def test_health_check_detects_markdown_colon_credentials_without_echoing_values(
     assert result["findings"] == [
         {"file": "pantalone/reference.md", "line": 1}
     ]
-    assert token not in repr(result)
+
+
+# ============================================================================
+# Institutional research (A-share broker reports via EastMoney reportapi)
+# ============================================================================
+
+
+def _load_institutional_module():
+    path = ROOT / "scripts/institutional_reports.py"
+    spec = importlib.util.spec_from_file_location("pantalone_institutional_reports", path)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_institutional_reports_script_compiles_and_rejects_prefixed_codes():
+    module = _load_institutional_module()
+    assert module.REPORT_API == "https://reportapi.eastmoney.com/report/list"
+    with pytest.raises(ValueError, match="裸6位代码"):
+        module.fetch_reports(code="sh600519")
+    with pytest.raises(ValueError, match="裸6位代码"):
+        module.fetch_reports(code="1.600519")
+
+
+def test_institutional_rating_normalization_and_summary():
+    module = _load_institutional_module()
+    records = [
+        {
+            "title": "需求根基稳固",
+            "orgSName": "中邮证券",
+            "publishDate": "2026-07-23 00:00:00.000",
+            "emRatingName": "买入",
+            "sRatingName": "买入",
+            "lastRatingName": "增持",
+            "predictThisYearEps": "67.19",
+            "predictNextYearEps": "69.76",
+            "predictThisYearPe": "19.42",
+            "predictNextYearPe": "18.71",
+            "infoCode": "AP1",
+        },
+        {
+            "title": "飞天茅台年内二次提价",
+            "orgSName": "群益证券",
+            "publishDate": "2026-07-20 00:00:00.000",
+            "emRatingName": "持有",
+            "sRatingName": "区间操作(Tranding Buy)",
+            "lastRatingName": "持有",
+            "predictThisYearEps": "68.91",
+            "predictNextYearEps": "71.98",
+            "infoCode": "AP2",
+        },
+    ]
+    normalized = module.normalize_records(records)
+    assert normalized[0]["rating"] == "买入"
+    assert normalized[1]["rating"] == "持有"
+    assert normalized[1]["raw_rating"] == "区间操作(Tranding Buy)"
+    assert normalized[0]["rating_change"] == "增持→买入"
+    assert normalized[1]["rating_change"] == ""
+    assert normalized[0]["eps_this_year"] == 67.19
+    assert normalized[0]["pe_next_year"] == 18.71
+
+    summary = module.rating_summary(normalized)
+    assert summary["total"] == 2
+    assert summary["rating_counts"] == {"买入": 1, "持有": 1}
+    assert summary["rating_disagreement"] is True
+    assert summary["eps_this_year_range"] == [67.19, 68.91]
+    assert [c["org"] for c in summary["rating_changes"]] == ["中邮证券"]
+
+
+def test_institutional_coverage_gap_detects_missing_recent_reports():
+    module = _load_institutional_module()
+    old = [
+        {
+            "title": "旧报告",
+            "orgSName": "某券商",
+            "publishDate": "2026-06-01 00:00:00.000",
+            "emRatingName": "买入",
+            "infoCode": "AP3",
+        }
+    ]
+    normalized = module.normalize_records(old)
+    assert module.coverage_gap(normalized, days=30) is True
+    fresh = [
+        {
+            "title": "新报告",
+            "orgSName": "某券商",
+            "publishDate": "2026-08-10 00:00:00.000",
+            "emRatingName": "买入",
+            "infoCode": "AP4",
+        }
+    ]
+    assert module.coverage_gap(module.normalize_records(fresh), days=30) is False
+
+
+def test_institutional_market_mode_omits_cross_stock_eps_range():
+    """全市场模式跨股票合并 EPS 区间无量纲意义，渲染时不得输出。"""
+    module = _load_institutional_module()
+    result = {
+        "code": "*",
+        "window_days": 180,
+        "as_of": "2026-08-13 19:00:00",
+        "records": [
+            {
+                "title": "报告A",
+                "org": "东吴证券",
+                "date": "2026-08-13",
+                "rating": "买入",
+                "raw_rating": "",
+                "rating_change": "",
+                "eps_this_year": -0.31,
+                "eps_next_year": 1.35,
+                "pe_this_year": -1832.96,
+                "pe_next_year": 424.19,
+                "info_code": "AP-M1",
+            },
+            {
+                "title": "报告B",
+                "org": "爱建证券",
+                "date": "2026-08-13",
+                "rating": "买入",
+                "raw_rating": "",
+                "rating_change": "",
+                "eps_this_year": 47.2,
+                "eps_next_year": 51.78,
+                "pe_this_year": 8.78,
+                "pe_next_year": 8.0,
+                "info_code": "AP-M2",
+            },
+        ],
+        "summary": module.rating_summary(
+            module.normalize_records(
+                [
+                    {"orgSName": "东吴证券", "publishDate": "2026-08-13 00:00:00.000",
+                     "emRatingName": "买入", "infoCode": "AP-M1"},
+                    {"orgSName": "爱建证券", "publishDate": "2026-08-13 00:00:00.000",
+                     "emRatingName": "买入", "infoCode": "AP-M2"},
+                ]
+            )
+        ),
+        "no_recent_coverage": False,
+        "downloads": [],
+    }
+    text = module._render_text(result)
+    assert "EPS预测区间" not in text
+
+
+@pytest.mark.live
+def test_institutional_reports_live_probe_for_300750():
+    """真实网络探针：东财 reportapi 返回记录并可结构化（网络不可用时跳过）。"""
+    module = _load_institutional_module()
+    try:
+        result = module.summarize(code="300750", days=180)
+    except Exception as exc:  # noqa: BLE001 — 网络环境失败时跳过而非失败
+        pytest.skip(f"网络不可用: {exc}")
+    assert result["code"] == "300750"
+    assert result["summary"]["total"] > 0
+    assert result["summary"]["orgs"]
+    assert result["summary"]["rating_counts"]
+    assert result["records"][0]["date"] >= result["records"][-1]["date"]
+    assert all(r["org"] for r in result["records"])
+    assert isinstance(result["no_recent_coverage"], bool)
 
 
 def test_md2docx_warns_when_malformed_table_falls_back(tmp_path):

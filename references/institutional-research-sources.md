@@ -80,6 +80,21 @@ curl -sS -H "User-Agent: research <your-email>" \
 3. 引用研报必须注明券商、日期和评级，不得匿名引用"有机构看好"；
 4. 港股研报暂未验证（东财 `qType=1` 实测返回的是行业研报而非个股港股研报；辉立/致富等渠道未验证），需要时先探针再使用。
 
+## 三-bis、自动化脚本（Pantalone 自带）
+
+`scripts/institutional_reports.py` 封装上述 A 股研报接口，输出结构化摘要：
+
+```bash
+python3 scripts/institutional_reports.py 600519 --days 180          # 个股摘要
+python3 scripts/institutional_reports.py 600519 --json              # JSON 输出
+python3 scripts/institutional_reports.py 300750 --download /tmp/reports  # 下载PDF
+python3 scripts/institutional_reports.py --market --limit 20        # 全市场最新
+```
+
+输出包含：评级分布、评级分歧检测、评级变化（`lastRatingName → emRatingName`）、
+今年/明年 EPS 预测区间、近 30 天覆盖缺口提示。代码必须为裸6位代码；脚本内置 1s
+东财限流。使用规则与上述红线一致（展示分歧、注明券商日期、不单独构成交易指令）。
+
 ## 四、验证记录（2026-08-13）
 
 | 探针 | 结果 |

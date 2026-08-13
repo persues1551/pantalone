@@ -124,6 +124,14 @@ OCIFQ 五维框架在美股中的映射：
 | F 财务三爆 | 营收+利润+现金流增速 | 营收增速>15% + FCF yield>3% + ROE>15% | 10-K/10-Q + StockAnalysis cash flow |
 | Q 连续季报 | 连续4季增长 | 连续4季 beat consensus + guidance上调 | SEC EDGAR + earnings history |
 
+### A股机构研报
+
+A股研究流程中使用 `subagents/institutional.md` 与 `scripts/institutional_reports.py`
+采集券商研报：评级分布、评级分歧、评级变化（`lastRatingName → emRatingName`）、
+今年/明年 EPS 预测区间与近 30 天覆盖缺口。数据源为东财研报中心（免 key，
+`code` 必须用裸6位代码），详见 `references/institutional-research-sources.md`。
+研报是参考证据：展示分歧不取平均，引用注明券商与日期，不单独构成交易指令。
+
 ### 美股排雷清单
 
 区别于 A股（ST/质押/商誉），美股风险审查重点：
